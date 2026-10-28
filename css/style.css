@@ -295,8 +295,7 @@ body.show-grid .box { box-shadow: inset 0 0 0 2px rgba(47, 124, 246, .55); }
 .bus-dot { fill: #fff; }
 .bus-inner { transition: transform var(--dur-med) var(--ease-soft); }
 .bus-stem, .bus-dot { transition: opacity var(--dur-fast); }
-.bus.on-line .bus-inner { transform: translateY(39px); }
-.bus.on-line .bus-stem, .bus.on-line .bus-dot { opacity: 0; }
+
 .bus.next .bus-chip { fill: var(--green); stroke: var(--green); }
 .bus.next .bus-text { fill: #0d1a0e; }
 .bus.next .bus-stem { stroke: var(--green); }
@@ -501,5 +500,3 @@ body.editing #stage { border-radius: 36px; box-shadow: 0 0 0 2px #1f1f1f; }
 .track.gap { stroke-dasharray: 0.1 16; stroke-linecap: round; }
 .bus-arrow { fill: #cfcfcf; transition: fill var(--dur-med); }
 .bus.next .bus-arrow { fill: var(--green); }
-.bus.on-line .bus-arrow { transform: translateY(0); }
-.bus.vertical .bus-chip { stroke-width: 1.6; }
