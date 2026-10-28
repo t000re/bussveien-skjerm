@@ -500,3 +500,6 @@ body.editing #stage { border-radius: 36px; box-shadow: 0 0 0 2px #1f1f1f; }
 .track.gap { stroke-dasharray: 0.1 16; stroke-linecap: round; }
 .bus-arrow { fill: #cfcfcf; transition: fill var(--dur-med); }
 .bus.next .bus-arrow { fill: var(--green); }
+.color-row { display: flex; align-items: center; gap: 12px; }
+.color-row .field-label { flex: 1; }
+.color-row input[type="color"] { width: 44px; height: 30px; border: 1px solid #333; border-radius: 8px; background: none; padding: 2px; cursor: pointer; }

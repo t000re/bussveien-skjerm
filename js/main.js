@@ -258,6 +258,7 @@
   /* ---------- Innstillinger ---------- */
   function onSettingsChange(what) {
     if (what === 'view') {
+      applyTheme();
       BV.anim.applySpeed(settings.view.speed);
       document.body.classList.toggle('show-grid', settings.view.grid);
       overlay.hidden = !settings.view.grid;
@@ -275,6 +276,18 @@
     } else if (what === 'panel') {
       fitStage();
     }
+  }
+
+  // Bakgrunnsfarge på boksene; lysere varianter til piller og skilt avledes fra den
+  function applyTheme() {
+    const hex = settings.view.cardColor || BV.settings.DEFAULT_CARD;
+    const n = parseInt(hex.slice(1), 16);
+    const rgb = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    const lift = t => `rgb(${rgb.map(c => Math.round(c + (255 - c) * t)).join(',')})`;
+    const root = document.documentElement.style;
+    root.setProperty('--card', hex);
+    root.setProperty('--card-2', lift(0.045));
+    root.setProperty('--card-3', lift(0.1));
   }
 
   /* ---------- Inndata ---------- */
@@ -303,6 +316,7 @@
 
   /* ---------- Start ---------- */
   BV.settings.init(settings, onSettingsChange);
+  applyTheme();
   BV.anim.applySpeed(settings.view.speed);
   document.body.classList.toggle('show-grid', settings.view.grid);
   overlay.hidden = !settings.view.grid;

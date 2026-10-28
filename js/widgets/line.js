@@ -84,31 +84,43 @@
     function side(prop, hiddenProp, nodesProp, depth) {
       const sm = buildSide(ps.map(p => ({ key: p.key, lineCode: p.lineCode, nodes: p[nodesProp] })), depth);
       const list = sm.branches.length ? sm.branches.map((b, bi) => ({ bi, keys: b.keys })) : [{ bi: 0, keys: sm.trunkKeys }];
-      let lane = 0;
+      // Én node per endeholdeplass, selv om flere grener ender der (slås sammen på navn)
+      const termMap = new Map();
       sm.ends = list.map(e => {
-        const terms = new Map();
-        let hidden = false;
+        const end = { bi: e.bi, hidden: false };
         e.keys.forEach(k => {
           const p = byKey.get(k), t = p[prop];
-          if (p[hiddenProp]) hidden = true;
+          if (p[hiddenProp]) end.hidden = true;
           if (!t) return;
-          if (!terms.has(t.stopId)) terms.set(t.stopId, { ...t, lines: new Set() });
-          terms.get(t.stopId).lines.add(p.lineCode);
+          const key = t.name.trim().toLowerCase();
+          if (!termMap.has(key)) termMap.set(key, { ...t, lines: new Set(), bis: new Set() });
+          const tm = termMap.get(key);
+          tm.lines.add(p.lineCode); tm.bis.add(e.bi); tm.gap = tm.gap || t.gap;
         });
-        const termList = [...terms.values()].sort((a, b) => [...b.lines].length - [...a.lines].length);
-        const end = { bi: e.bi, terms: termList, hidden, lane };
-        lane += Math.max(1, termList.length);
         return end;
       });
-      sm.lanes = lane;
-      sm.branchLane = bi => (sm.ends.find(e => e.bi === bi) || { lane: 0 }).lane;
+      // Spor: hver gren får sitt eget; endeholdeplassen fortsetter helst rett fram på en gren den hører til
+      const branchLane = {};
+      list.forEach((e, i) => { branchLane[e.bi] = i; });
+      let maxLane = list.length - 1;
+      const taken = new Set();
+      const terms = [...termMap.values()].sort((a, b) => a.bis.size - b.bis.size || b.lines.size - a.lines.size);
+      terms.forEach(tm => {
+        const cands = [...tm.bis].map(bi => branchLane[bi]).sort((a, b) => b - a);
+        const free = cands.find(l => !taken.has(l));
+        tm.lane = free !== undefined ? free : ++maxLane;
+        taken.add(tm.lane);
+      });
+      sm.terms = terms.sort((a, b) => a.lane - b.lane);
+      sm.lanes = maxLane + 1;
+      sm.branchLane = bi => branchLane[bi] || 0;
       return sm;
     }
     const up = side('origin', 'hiddenUp', 'up', o.before);
     const down = side('terminus', 'hiddenDown', 'down', o.after);
     const sig = JSON.stringify([o, up.trunk.map(n => n.stopId), up.branches.map(b => b.nodes.map(n => n.stopId)),
       down.trunk.map(n => n.stopId), down.branches.map(b => [b.nodes.map(n => n.stopId), [...b.lines]]),
-      up.ends.map(e => e.terms.map(t => t.stopId)), down.ends.map(e => e.terms.map(t => t.stopId)), data.stop.name]);
+      up.terms.map(t => [t.name, t.lane]), down.terms.map(t => [t.name, t.lane]), up.ends.map(e => e.hidden), down.ends.map(e => e.hidden), data.stop.name]);
     return { up, down, journeys, sig, patterns: ps, hereName: data.stop.name || 'Her', o };
   }
 
@@ -144,8 +156,6 @@
     while (t.length > 2 && textWidth(t + '…', size, weight) > maxW) t = t.slice(0, -1);
     return t.trimEnd() + '…';
   }
-  const chipW = code => Math.max(30, 12 + String(code).length * 11);
-  const chipsW = lines => [...lines].reduce((a, c) => a + chipW(c) + 4, -4);
 
   BV.widgets.line = {
     title: 'Trasé',
@@ -228,26 +238,37 @@
         const padEdge = vertical ? 26 : 28;
         const lineInfo = new Map(m.patterns.map(p => [p.lineCode, p.line || { code: p.lineCode }]));
         const visCount = sm => sm.trunk.length + Math.max(0, ...sm.branches.map(b => b.nodes.length));
-        const chipFor = (sm, dir, n) => dir > 0 ? (n > 1 || sm.ends.length > 1 || m.patterns.length > 1) : n > 1;
-        const termInfo = (sm, dir) => {
-          const terms = sm.ends.flatMap(e => e.terms.map(t => ({ t, chips: chipFor(sm, dir, e.terms.length) })));
-          if (!terms.length) return { has: false, reserve: 0, chips: 0 };
-          if (vertical) return { has: true, reserve: 0, chips: 0 };
-          const chips = Math.max(...terms.map(x => x.chips ? chipsW(x.t.lines) + 10 : 0));
-          const name = Math.max(...terms.map(x => textWidth(x.t.name, fs, 600)));
-          return { has: true, reserve: r + 10 + chips + Math.min(name, 260), chips };
+        // Hver side: synlige stopp, deretter enten endeholdeplass (navn ytterst) eller en
+        // stiplet stump helt ut til kanten når linjen fortsetter. Det som er igjen av lengden
+        // fordeles på de stiplede strekkene, så traseen alltid fyller hele boksen.
+        const sideInfo = sm => {
+          const hasTerm = sm.terms.length > 0;
+          const stub = !hasTerm && sm.ends.some(e => e.hidden);
+          const name = hasTerm && !vertical ? Math.min(260, Math.max(...sm.terms.map(t => textWidth(t.name, fs, 600)))) : 0;
+          return { hasTerm, stub, flex: hasTerm || stub, reserve: hasTerm ? (vertical ? 4 : r + 10 + name) : 0, n: visCount(sm) };
         };
-        const tUp = termInfo(m.up, -1), tDown = termInfo(m.down, 1);
-        const nUp = visCount(m.up), nDown = visCount(m.down);
+        const sUp = sideInfo(m.up), sDown = sideInfo(m.down);
         const minGap = angled || vertical ? 56 : 40;
         const [minSlot, maxSlot] = vertical ? [56, 190] : angled ? [56, 120] : [88, 180];
-        const avail = (n, t) => n ? (L / 2 - padEdge - t.reserve - (t.has ? minGap : 18)) / n : Infinity;
-        const slot = Math.max(minSlot, Math.min(avail(nUp, tUp), avail(nDown, tDown), maxSlot));
-        const aC = L / 2;
-        // Plass til navnet på endeholdeplassen (kortes ned hvis det ikke er nok)
-        const nameRoom = (n, t) => Math.max(50, L / 2 - padEdge - n * slot - minGap - r - 10 - t.chips);
-        const termA = (dir, n, t) => vertical ? aC + dir * (L / 2 - padEdge - 4)
-          : aC + dir * (L / 2 - padEdge - r - 10 - t.chips - Math.min(t.reserve - r - 10 - t.chips, nameRoom(n, t)));
+        const gapMin = si => si.hasTerm ? minGap : si.stub ? 36 : 0;
+        const nTot = Math.max(1, sUp.n + sDown.n);
+        const usable = L - 2 * padEdge;
+        let fixed = sUp.reserve + sDown.reserve + gapMin(sUp) + gapMin(sDown);
+        const slot = Math.max(minSlot, Math.min(maxSlot, (usable - fixed) / nTot));
+        // Ikke nok plass: endeholdeplassnavnene kortes ned
+        const squeeze = Math.max(0, fixed + slot * nTot - usable);
+        if (squeeze) {
+          const tot = Math.max(1, sUp.reserve + sDown.reserve);
+          [sUp, sDown].forEach(si => { if (si.reserve) si.reserve = Math.max(r + 60, si.reserve - squeeze * si.reserve / tot); });
+          fixed = sUp.reserve + sDown.reserve + gapMin(sUp) + gapMin(sDown);
+        }
+        const extra = Math.max(0, usable - fixed - slot * nTot);
+        const flexCount = (sUp.flex ? 1 : 0) + (sDown.flex ? 1 : 0);
+        const gapUp = gapMin(sUp) + (sUp.flex ? extra / flexCount : 0);
+        const shift = flexCount ? 0 : extra / 2;   // ingen stiplede strekk: midtstill hele traseen
+        const aC = padEdge + shift + sUp.reserve + gapUp + sUp.n * slot;
+        const termA = dir => dir > 0 ? L - padEdge - sDown.reserve : padEdge + sUp.reserve;
+        const nameRoom = dir => Math.max(40, (dir > 0 ? sDown : sUp).reserve - r - 10);
 
         const colored = BV.colors.mode(ctx) !== 'neutral';
         const strokeOf = code => BV.colors.stroke(code, (lineInfo.get(code) || {}).color, ctx);
@@ -268,23 +289,6 @@
           });
         }
         const seg = (dir, p, q, lines, cls) => track(dir > 0 ? p : q, dir > 0 ? q : p, lines, cls);
-
-        function chips(x, y, lines, anchorRight) {
-          const codes = [...lines].sort();
-          const h = dy && dy < 40 ? 26 : 30;
-          const total = chipsW(codes);
-          const g = svg('g', { class: 'branch-chips', transform: `translate(${anchorRight ? x - total : x}, ${y - h / 2})` }, labels);
-          let x0 = 0;
-          codes.forEach(code => {
-            const w = chipW(code);
-            const st = BV.colors.chip(lineInfo.get(code) || { code }, ctx);
-            svg('rect', { x: x0, y: 0, width: w, height: h, rx: 8, class: 'bchip', style: st ? `fill:${st.bg}` : '' }, g);
-            const tx = svg('text', { x: x0 + w / 2, y: h / 2 + 1, class: 'bchip-text', 'text-anchor': 'middle', 'dominant-baseline': 'central', style: st ? `fill:${st.fg}` : '' }, g);
-            tx.textContent = code;
-            x0 += w + 4;
-          });
-          return total;
-        }
 
         // Etikett for et stopp. above = navnet står over linjen (øvre gren)
         function label(p, text, o = {}) {
@@ -324,12 +328,11 @@
         }
 
         // Endeholdeplass: vannrett navn ved siden av prikken, linjenummer mellom prikk og navn
-        function termLabel(p, tm, dir, room, withChips) {
+        function termLabel(p, tm, dir, room) {
           const P = map(p.a, p.o);
           const sideDir = vertical ? 1 : dir;
-          let x = P.x + sideDir * (r + 10);
-          if (withChips) x += sideDir * (chips(x, P.y, tm.lines, sideDir < 0) + 8);
-          if (vertical) room = C - (x - 0) - 10;
+          const x = P.x + sideDir * (r + 10);
+          if (vertical) room = C - x - 10;
           const t = svg('text', { x, y: P.y, class: 'stop-label term-label', 'text-anchor': sideDir > 0 ? 'start' : 'end', 'dominant-baseline': 'central', 'font-size': fs }, labels);
           t.textContent = fit(tm.name, fs, room, 600);
         }
@@ -338,7 +341,7 @@
         const gapPath = new Map();  // side|stopId -> { from, mid } – første del av veien mot endeholdeplassen
         const here = { a: aC, o: o0 };
 
-        function side(name, sm, dir, ti, n) {
+        function side(name, sm, dir) {
           const pts = [];
           const endPos = {};
           let prev = here;
@@ -363,31 +366,32 @@
           });
 
           // Mot start-/endeholdeplass: gaffelen går ut rett etter siste viste stopp
-          const aEnd = termA(dir, n, ti);
-          const room = nameRoom(n, ti);
+          const aEnd = termA(dir);
           sm.ends.forEach(e => {
             const from = endPos[e.bi];
-            if (!from) return;
-            if (!e.terms.length) {
-              if (e.hidden) seg(dir, from.p, { a: from.p.a + dir * Math.min(slot * 0.8, 56), o: from.p.o }, from.lines, 'track gap');
-              return;
+            if (from && e.hidden && !sm.terms.some(t => t.bis.has(e.bi))) {
+              // Linjen fortsetter, men endeholdeplassen vises ikke: stiplet helt ut til kanten
+              seg(dir, from.p, { a: dir > 0 ? L - padEdge : padEdge, o: from.p.o }, from.lines, 'track gap');
             }
-            const forkLen = Math.min(Math.max(slot * 0.9, 50), Math.abs(aEnd - from.p.a) * 0.45);
-            const withChips = chipFor(sm, dir, e.terms.length);
-            e.terms.forEach((tm, i) => {
-              const o = laneO(e.lane + i);
+          });
+          sm.terms.forEach((tm, i) => {
+            const o = laneO(tm.lane);
+            // Vertikalt: endeholdeplassene trappes, så navnene (til høyre) ikke krysser andre spor
+            const a = vertical ? aEnd - dir * (sm.terms.length - 1 - i) * 46 : aEnd;
+            const p = { a, o, n: tm };
+            const cls = 'track' + (tm.gap ? ' gap' : '');
+            [...tm.bis].forEach(bi => {
+              const from = endPos[bi];
+              if (!from) return;
+              const forkLen = Math.min(Math.max(slot * 0.9, 50), Math.abs(a - from.p.a) * 0.45);
               const mid = { a: from.p.a + dir * forkLen, o };
-              // Vertikalt: endeholdeplassene trappes, så navnene (til høyre) ikke krysser andre spor
-              const a = vertical ? aEnd - dir * (sm.lanes - 1 - (e.lane + i)) * 46 : aEnd;
-              const p = { a, o, n: tm };
-              const cls = 'track' + (tm.gap ? ' gap' : '');
               seg(dir, from.p, mid, [...tm.lines], cls);
               seg(dir, mid, p, [...tm.lines], cls);
-              gapPath.set(name + '|' + tm.stopId, { from: from.p, mid });
-              const P = map(p.a, p.o);
-              svg('circle', { cx: P.x, cy: P.y, r: r + 1, class: 'term-dot' }, dots);
-              termLabel(p, tm, dir, room, withChips);
+              gapPath.set(name + '|' + tm.name.trim().toLowerCase() + '|' + Math.round(from.p.o), { from: from.p, mid });
             });
+            const P = map(p.a, p.o);
+            svg('circle', { cx: P.x, cy: P.y, r: r + 1, class: 'term-dot' }, dots);
+            termLabel(p, tm, dir, nameRoom(dir));
           });
 
           pts.forEach(p => {
@@ -396,8 +400,8 @@
             label(p, p.n.name, { above: p.above });
           });
         }
-        side('down', m.down, 1, tDown, nDown);
-        side('up', m.up, -1, tUp, nUp);
+        side('down', m.down, 1);
+        side('up', m.up, -1);
 
         // Holdeplassen: navnet som de andre, «Du er her» under
         const HP = map(here.a, here.o);
@@ -435,7 +439,7 @@
         }
         // Videre: bussen følger gaffelen mot sin endeholdeplass og tones ut
         const lastP = pts[pts.length - 1];
-        const gp = G.gapPath.get('down|' + calls[calls.length - 1].stopId);
+        const gp = G.gapPath.get('down|' + calls[calls.length - 1].name.trim().toLowerCase() + '|' + Math.round(lastP.o));
         const nextCall = calls[lastI + 1];
         if (gp && nextCall) pts.push({ ...gp.mid, time: nextCall.time, edge: true, curveFrom: gp.from, curveTo: gp.mid });
         else pts.push({ a: lastP.a, o: lastP.o, time: lastP.time + 60000, edge: true });

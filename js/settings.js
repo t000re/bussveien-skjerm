@@ -3,6 +3,7 @@ window.BV = window.BV || {};
 
 (function (BV) {
   const KEY = 'bussveien.settings.v1';
+  const DEFAULT_CARD = '#171717';
 
   // Rekkefølgen her er prioriteten. sizes = tillatte størrelser (største først).
   const PRESETS = {
@@ -49,7 +50,7 @@ window.BV = window.BV || {};
       preset: 'skisse2',
       widgets: clone(PRESETS.skisse2.widgets),
       sim: { traffic: false, autoTraffic: true },
-      view: { grid: false, speed: 1, colorMode: 'neutral', busStops: 2, labelAngle: 'flat', stopsBefore: 3, stopsAfter: 3, showOrigin: true, showTerminus: true },
+      view: { grid: false, speed: 1, colorMode: 'neutral', busStops: 2, labelAngle: 'flat', cardColor: null, stopsBefore: 3, stopsAfter: 3, showOrigin: true, showTerminus: true },
       lineColors: {},
       manual: {}
     };
@@ -179,20 +180,15 @@ window.BV = window.BV || {};
     statusEl = h('div', { class: 'status-line' });
     body.append(section('Datakilde',
       seg([{ id: 'auto', label: 'Auto' }, { id: 'entur', label: 'Entur' }, { id: 'demo', label: 'Demo' }], state.source, v => { state.source = v; changed('source'); render(); }),
-      h('p', { class: 'hint' }, 'Auto bruker Entur og faller tilbake til demodata hvis Entur ikke svarer.'),
       statusEl));
     setStatus(lastStatus, lastErr);
 
-    // Oppsett
+    // Layout
     const manualCount = Object.keys(state.manual || {}).length;
-    body.append(section('Oppsett fra skissene',
-      h('div', { class: 'preset-row' }, Object.entries(PRESETS).map(([id, p]) =>
-        h('button', { class: 'preset' + (state.preset === id ? ' on' : ''), onclick: () => applyPreset(id) },
-          h('strong', {}, p.label), h('span', {}, p.hint)))),
-      h('button', { class: 'primary-btn', onclick: () => { toggleOpen(false); BV.editor && BV.editor.toggle(true); } }, 'Rediger layout i visningen (E)'),
-      h('p', { class: 'hint' }, 'Dra boksene for å flytte dem og dra i hjørnet for å endre størrelse. Alt låser seg til rutenettet. Layouten lagres for den kombinasjonen av bokser som vises, så du kan lage én med og én uten trafikkmelding (trykk T mens du redigerer).'),
+    body.append(section('Layout',
+      h('button', { class: 'primary-btn', onclick: () => { toggleOpen(false); BV.editor && BV.editor.toggle(true); } }, 'Rediger layout (E)'),
       manualCount ? h('div', { class: 'manual-row' },
-        h('span', {}, manualCount === 1 ? '1 egen layout lagret' : manualCount + ' egne layouter lagret'),
+        h('span', {}, manualCount === 1 ? '1 egen layout' : manualCount + ' egne layouter'),
         h('button', { class: 'link-btn', onclick: () => { state.manual = {}; changed('manual'); render(); } }, 'Tilbake til automatisk')) : null));
 
     // Infobokser
@@ -204,23 +200,11 @@ window.BV = window.BV || {};
         h('div', { class: 'wtop' },
           h('span', { class: 'wnum' }, String(i + 1)),
           h('span', { class: 'wgrip', title: 'Dra for å endre prioritet' }, '⋮⋮'),
-          h('div', { class: 'wname' }, h('strong', {}, def.title), h('span', {}, def.description || '')),
+          h('div', { class: 'wname' }, h('strong', {}, def.title)),
           h('div', { class: 'warrows' },
             h('button', { class: 'icon-btn sm', title: 'Høyere prioritet', disabled: i === 0, onclick: () => move(i, i - 1) }, '↑'),
             h('button', { class: 'icon-btn sm', title: 'Lavere prioritet', disabled: i === state.widgets.length - 1, onclick: () => move(i, i + 1) }, '↓')),
           def.required ? h('span', { class: 'req' }, 'Alltid') : toggle(w.enabled, v => { w.enabled = v; changed('widgets'); render(); })),
-        h('div', { class: 'wsizes' },
-          h('span', { class: 'wlabel' }, 'Størrelser'),
-          def.sizes.map(sz => h('button', {
-            class: 'chip' + (w.sizes.includes(sz) ? ' on' : ''),
-            title: 'Bredde × høyde i ruter (12 × 20 totalt)',
-            onclick: () => {
-              const has = w.sizes.includes(sz);
-              if (has && w.sizes.length === 1) return;
-              w.sizes = has ? w.sizes.filter(x => x !== sz) : def.sizes.filter(x => x === sz || w.sizes.includes(x));
-              changed('widgets'); render();
-            }
-          }, sz.replace('x', '×')))),
         def.modes ? h('div', { class: 'wsizes' },
           h('span', { class: 'wlabel' }, 'Vises'),
           seg(def.modes, w.mode, v => { w.mode = v; changed('widgets'); render(); })) : null);
@@ -231,9 +215,7 @@ window.BV = window.BV || {};
       li.addEventListener('drop', e => { e.preventDefault(); li.classList.remove('dragover'); move(+e.dataTransfer.getData('text/plain'), i); });
       list.append(li);
     });
-    body.append(section('Infobokser etter prioritet',
-      h('p', { class: 'hint' }, 'Nummer 1 er viktigst. Layouten fylles ovenfra og ned i denne rekkefølgen. Er det ikke plass, krymper lavere prioriterte bokser først, deretter skjules de. Når det kommer en trafikkmelding, får den alltid plass.'),
-      list));
+    body.append(section('Infobokser etter prioritet', list));
 
     // Simulering
     body.append(section('Simulering',
@@ -241,28 +223,18 @@ window.BV = window.BV || {};
       toggle(state.sim.autoTraffic, v => { state.sim.autoTraffic = v; changed('sim'); }, 'Veksle trafikkmelding automatisk i demo')));
 
     // Visning
-    const speedVal = h('span', { class: 'range-val' }, state.view.speed.toFixed(2).replace(/0$/, '') + '×');
+    const speedVal = h('span', { class: 'range-val' }, state.view.speed + '×');
+    const card = state.view.cardColor || DEFAULT_CARD;
     body.append(section('Visning',
-      toggle(state.view.grid, v => { state.view.grid = v; changed('view'); }, 'Vis rutenett og prioritet (G)'),
-      h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Fargemodus på linjene'),
+      toggle(state.view.grid, v => { state.view.grid = v; changed('view'); }, 'Vis rutenett (G)'),
+      h('div', { class: 'color-row' },
+        h('span', { class: 'field-label' }, 'Bakgrunn på boksene'),
+        h('input', { type: 'color', id: 'cardColor', value: card, oninput: e => { state.view.cardColor = e.target.value; changed('view'); } }),
+        state.view.cardColor ? h('button', { class: 'link-btn muted', onclick: () => { state.view.cardColor = null; changed('view'); render(); } }, 'Standard') : null),
+      h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Linjefarger'),
         seg([{ id: 'neutral', label: 'Nøytral' }, { id: 'line', label: 'Linjefarger' }, { id: 'tint', label: 'Dempet' }],
           state.view.colorMode, v => { state.view.colorMode = v; changed('view'); render(); })),
       lineColorList(),
-      h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Stoppnavn i trasé'),
-        seg([{ id: 'flat', label: 'Rett' }, { id: 'angled', label: 'Skrå 45°' }],
-          state.view.labelAngle, v => { state.view.labelAngle = v; changed('view'); render(); })),
-      h('p', { class: 'hint' }, 'Trasé blir vertikal av seg selv når boksen er høyere enn den er bred, f.eks. 4×20. Skrå navn gjelder den liggende varianten.'),
-      h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Stopp før holdeplassen'),
-        seg([1, 2, 3, 4, 5].map(n => ({ id: n, label: String(n) })),
-          state.view.stopsBefore, v => { state.view.stopsBefore = v; changed('view'); render(); })),
-      h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Stopp etter holdeplassen'),
-        seg([1, 2, 3, 4, 5].map(n => ({ id: n, label: String(n) })),
-          state.view.stopsAfter, v => { state.view.stopsAfter = v; changed('view'); render(); })),
-      toggle(state.view.showOrigin, v => { state.view.showOrigin = v; changed('view'); }, 'Vis startholdeplass'),
-      toggle(state.view.showTerminus, v => { state.view.showTerminus = v; changed('view'); }, 'Vis endeholdeplass'),
-      h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Vis busser i trasé fra'),
-        seg([1, 2, 3, 4, 5].filter(n => n <= state.view.stopsBefore).map(n => ({ id: n, label: n + ' stopp unna' })),
-          state.view.busStops, v => { state.view.busStops = v; changed('view'); render(); })),
       h('label', { class: 'range' },
         h('span', {}, 'Animasjonstempo'),
         h('input', {
@@ -270,6 +242,21 @@ window.BV = window.BV || {};
           oninput: e => { state.view.speed = +e.target.value; speedVal.textContent = state.view.speed + '×'; changed('view'); }
         }),
         speedVal)));
+
+    // Trasé
+    const nums = max => [1, 2, 3, 4, 5].filter(n => n <= max).map(n => ({ id: n, label: String(n) }));
+    body.append(section('Trasé',
+      h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Stoppnavn'),
+        seg([{ id: 'flat', label: 'Rett' }, { id: 'angled', label: 'Skrå 45°' }],
+          state.view.labelAngle, v => { state.view.labelAngle = v; changed('view'); render(); })),
+      h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Stopp før'),
+        seg(nums(5), state.view.stopsBefore, v => { state.view.stopsBefore = v; if (state.view.busStops > v) state.view.busStops = v; changed('view'); render(); })),
+      h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Stopp etter'),
+        seg(nums(5), state.view.stopsAfter, v => { state.view.stopsAfter = v; changed('view'); render(); })),
+      toggle(state.view.showOrigin, v => { state.view.showOrigin = v; changed('view'); }, 'Startholdeplass'),
+      toggle(state.view.showTerminus, v => { state.view.showTerminus = v; changed('view'); }, 'Endeholdeplass'),
+      h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Vis busser fra (stopp unna)'),
+        seg(nums(state.view.stopsBefore), state.view.busStops, v => { state.view.busStops = v; changed('view'); render(); }))));
 
     body.append(section('Snarveier', keysList(),
       h('button', {
@@ -290,7 +277,7 @@ window.BV = window.BV || {};
     const data = BV.app && BV.app.ctx.data;
     const lines = new Map();
     if (data) data.departures.forEach(d => { if (!lines.has(d.line.code)) lines.set(d.line.code, d.line); });
-    if (!lines.size) return h('p', { class: 'hint' }, 'Ingen linjer å vise ennå.');
+    if (!lines.size) return null;
     const wrap = h('div', { class: 'line-colors' });
     [...lines.values()].sort((a, b) => String(a.code).localeCompare(String(b.code), 'nb', { numeric: true })).forEach(line => {
       const chip = BV.util.lineChip(line, BV.app.ctx);
@@ -301,14 +288,14 @@ window.BV = window.BV || {};
         oninput: e => { state.lineColors[line.code] = e.target.value; BV.util.setLineChip(chip, line, BV.app.ctx); changed('colors'); }
       });
       wrap.append(h('div', { class: 'lc-row' }, chip, input,
-        overridden ? h('button', { class: 'link-btn muted', onclick: () => { delete state.lineColors[line.code]; changed('colors'); render(); } }, 'Bruk Entur-farge') : h('span', { class: 'hint' }, line.color ? 'fra Entur' : 'standard')));
+        overridden ? h('button', { class: 'link-btn muted', onclick: () => { delete state.lineColors[line.code]; changed('colors'); render(); } }, 'Standard') : null));
     });
     return wrap;
   }
 
   function keysList() {
     const dl = h('dl', { class: 'keys' });
-    [['S', 'Innstillinger'], ['E', 'Rediger layout (dra og skaler bokser)'], ['T', 'Trafikkmelding av/på'], ['G', 'Rutenett og prioritet'], ['1–3', 'Skisse 1–3'], ['F', 'Fullskjerm'], ['Esc', 'Lukk innstillinger']]
+    [['S', 'Innstillinger'], ['E', 'Rediger layout (dra og skaler bokser)'], ['T', 'Trafikkmelding av/på'], ['G', 'Rutenett og prioritet'], ['F', 'Fullskjerm'], ['Esc', 'Lukk innstillinger']]
       .forEach(([k, v]) => dl.append(h('dt', {}, h('kbd', {}, k)), h('dd', {}, v)));
     return dl;
   }
@@ -379,7 +366,7 @@ window.BV = window.BV || {};
   }
 
   BV.settings = {
-    PRESETS,
+    PRESETS, DEFAULT_CARD,
     load, save, normalizeWidgets, applyPreset, setStatus,
     get isOpen() { return open; },
     init(s, cb) { state = s; onChange = cb; panel = document.getElementById('settings'); },
