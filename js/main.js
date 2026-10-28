@@ -34,11 +34,30 @@
       h: p.h * ROW_H + (p.h - 1) * GAP,
       cols: p.w, rows: p.h
     };
-    if (!raw && settings.view.showStopName === false && p.y === 0 && g.x < CLOCK_LEFT - GAP - 60) {
+    if (!raw && settings.view.showStopName === false && p.y === 0 && g.x < CLOCK_LEFT - NOTCH_GAP - 60) {
       g.y = PAD; g.h += HEADER_H + GAP;
+      // Ligger boksen under klokken, skjæres klokken ut av den
+      if (g.x + g.w > CLOCK_LEFT - NOTCH_GAP) g.notch = (STAGE_W - PAD) - (g.x + g.w);
     }
     return g;
   }
+
+  /* Utskjæringen rundt klokken: en maske som trekker fra et hakk øverst til høyre i boksen.
+     Mellomrommet rundt klokken er det samme som til skjermkanten (PAD). Indre hjørne følger
+     klokkens rundinger, og boksens nye ytterhjørner rundes like mye som resten av boksene. */
+  const NOTCH_GAP = PAD;
+  const NOTCH_MASK = (() => {
+    const R = 28, m = NOTCH_GAP, Rc = R + m;
+    const Wn = 220 + m, Hn = HEADER_H + m;          // selve hakket
+    const SW = Wn + R, SH = Hn + R;                  // + plass til avrunding av boksens nye hjørner
+    const d = [
+      `M${R} 0 L${SW} 0 L${SW} ${Hn} L${R + Rc} ${Hn} A${Rc} ${Rc} 0 0 1 ${R} ${Hn - Rc} Z`,
+      `M0 0 L${R} 0 L${R} ${R} A${R} ${R} 0 0 0 0 0 Z`,
+      `M${SW - R} ${Hn} L${SW} ${Hn} L${SW} ${Hn + R} A${R} ${R} 0 0 0 ${SW - R} ${Hn} Z`
+    ].join(' ');
+    const svgSrc = `<svg xmlns='http://www.w3.org/2000/svg' width='${SW}' height='${SH}'><path d='${d}' fill='black'/></svg>`;
+    return { url: `url("data:image/svg+xml,${encodeURIComponent(svgSrc)}")`, w: SW, h: SH };
+  })();
 
   /* ---------- Skalering ---------- */
   function fitStage() {
@@ -185,6 +204,16 @@
     el.style.transform = `translate(${g.x}px, ${g.y}px)`;
     el.style.width = g.w + 'px';
     el.style.height = g.h + 'px';
+    if (g.notch !== undefined) {
+      const m = `linear-gradient(#000 0 0), ${NOTCH_MASK.url} right ${g.notch}px top 0 / ${NOTCH_MASK.w}px ${NOTCH_MASK.h}px no-repeat`;
+      el.style.webkitMask = m;
+      el.style.mask = m;
+      el.style.webkitMaskComposite = 'xor';
+      el.style.maskComposite = 'subtract';
+    } else if (el.style.mask || el.style.webkitMask) {
+      el.style.webkitMask = el.style.mask = '';
+      el.style.webkitMaskComposite = el.style.maskComposite = '';
+    }
   }
 
   function buildOverlay() {

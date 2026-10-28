@@ -517,14 +517,4 @@ body.editing #stage { border-radius: 36px; box-shadow: 0 0 0 2px #1f1f1f; }
 /* ---------- Uten holdeplassnavn: klokken skjærer seg ned i boksen under ---------- */
 .topbar-stop, .topbar-time { pointer-events: auto; transition: opacity var(--dur-layout) var(--ease-soft), transform var(--dur-layout) var(--ease-spring), box-shadow var(--dur-layout) var(--ease-soft); }
 body.no-stopname .topbar-stop { opacity: 0; transform: translateY(-24px); pointer-events: none; }
-/* «Vollgrav» i bakgrunnsfargen rundt klokken holder mellomrommet til boksen under */
-body.no-stopname .topbar-time { box-shadow: 0 0 0 16px var(--bg); }
-/* Avrundede ytterhjørner der boksen møter utsnittet */
-.notch-corner {
-  position: absolute; width: 28px; height: 28px; z-index: 4; pointer-events: none; opacity: 0;
-  background: radial-gradient(circle at 0 100%, transparent 27.5px, var(--bg) 28px);
-  transition: opacity var(--dur-layout) var(--ease-soft);
-}
-.nc-a { left: 792px; top: 24px; }   /* venstre for klokken: 1080-24-220-16-28 */
-.nc-b { left: 1028px; top: 140px; } /* under klokken: 24+100+16 */
-body.no-stopname .notch-corner { opacity: 1; }
+
