@@ -353,15 +353,22 @@
      slik at skjermene alltid viser siste utgave uten at noen trenger å gjøre noe. */
   function watchVersion() {
     if (!/^https?:/.test(location.protocol) || window.BV_VERSION === 'dev') return;
-    setInterval(async () => {
+    async function check() {
       if (BV.editor && BV.editor.active) return;
       try {
         const res = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
         if (!res.ok) return;
         const { version } = await res.json();
-        if (version && version !== window.BV_VERSION) location.reload();
+        if (!version || version === window.BV_VERSION) return;
+        // Ny adresse (?v=…) tvinger nettleseren til å hente ny index.html i stedet for en lagret kopi
+        const url = new URL(location.href);
+        if (url.searchParams.get('v') === version) return;   // unngå løkke hvis Pages ennå ikke er oppdatert
+        url.searchParams.set('v', version);
+        location.replace(url.toString());
       } catch (e) { /* offline: prøv igjen senere */ }
-    }, 60000);
+    }
+    check();
+    setInterval(check, 60000);
   }
   watchVersion();
 
