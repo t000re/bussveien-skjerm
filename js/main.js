@@ -115,8 +115,8 @@
       boxes.delete(id);
       b.el.classList.add('leaving');
       const a = b.el.animate([
-        { opacity: 1, scale: '1', filter: 'blur(0px)' },
-        { opacity: 0, scale: '0.9', filter: 'blur(10px)' }
+        { opacity: 1, scale: '1' },
+        { opacity: 0, scale: '0.94' }
       ], { duration: dur * 0.45, easing: BV.anim.ease, fill: 'forwards' });
       a.onfinish = () => { b.inst.destroy && b.inst.destroy(); b.el.remove(); };
     });
@@ -147,8 +147,8 @@
         el.style.transition = '';
         if (!first) {
           el.animate([
-            { opacity: 0, scale: '0.9', filter: 'blur(12px)' },
-            { opacity: 1, scale: '1', filter: 'blur(0px)' }
+            { opacity: 0, scale: '0.94' },
+            { opacity: 1, scale: '1' }
           ], { duration: dur * 0.8, easing: BV.anim.ease, delay: hadExit ? dur * 0.4 : dur * 0.3, fill: 'backwards' });
         } else {
           el.animate([

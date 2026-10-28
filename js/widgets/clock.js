@@ -3,8 +3,8 @@
 (function (BV) {
   const { svg, upcoming } = BV.util;
   const C = 100;            // senter i viewBox 200×200
-  const R_FACE = 92;
-  const R_MARK = 70;
+  const R_FACE = 76;
+  const R_MARK = 87;      // merkene ligger utenfor urskiven
 
   function polar(angleDeg, r) {
     const a = (angleDeg - 90) * Math.PI / 180;
@@ -32,7 +32,7 @@
 
     create(root, ctx) {
       root.classList.add('w-clock');
-      const s = svg('svg', { viewBox: '0 0 200 200', class: 'clock-svg', preserveAspectRatio: 'xMidYMid meet' });
+      const s = svg('svg', { viewBox: '-8 -8 216 216', class: 'clock-svg', preserveAspectRatio: 'xMidYMid meet' });
       root.appendChild(s);
       svg('circle', { cx: C, cy: C, r: R_FACE, class: 'clock-face' }, s);
       const ticks = svg('g', { class: 'clock-ticks' }, s);
@@ -44,15 +44,15 @@
           svg('line', { x1: x0, y1: y0, x2: x1, y2: y1, class: 'tick minor' }, ticks);
           continue;
         }
-        const [x0, y0] = polar(i * 6, R_FACE - (major ? 15 : 11));
+        const [x0, y0] = polar(i * 6, R_FACE - (major ? 13 : 9.5));
         const [x1, y1] = polar(i * 6, R_FACE - 5);
         svg('line', { x1: x0, y1: y0, x2: x1, y2: y1, class: 'tick' + (major ? ' major' : '') }, ticks);
       }
       const arc = svg('path', { class: 'clock-arc', d: '' }, s);
       const marks = svg('g', { class: 'clock-marks' }, s);
-      const hourHand = svg('line', { x1: C, y1: C + 8, x2: C, y2: C - 44, class: 'hand hour' }, s);
-      const minHand = svg('line', { x1: C, y1: C + 10, x2: C, y2: C - 74, class: 'hand minute' }, s);
-      const secHand = svg('line', { x1: C, y1: C + 14, x2: C, y2: C - 80, class: 'hand second' }, s);
+      const hourHand = svg('line', { x1: C, y1: C + 7, x2: C, y2: C - 36, class: 'hand hour' }, s);
+      const minHand = svg('line', { x1: C, y1: C + 8, x2: C, y2: C - 60, class: 'hand minute' }, s);
+      const secHand = svg('line', { x1: C, y1: C + 12, x2: C, y2: C - 66, class: 'hand second' }, s);
       svg('circle', { cx: C, cy: C, r: 3.6, class: 'hand-hub' }, s);
       svg('circle', { cx: C, cy: C, r: 1.4, class: 'hand-hub-in' }, s);
 
@@ -89,7 +89,7 @@
           let r = R_MARK;
           for (const p of placed) {
             let da = Math.abs(p.ang - ang); if (da > 180) da = 360 - da;
-            if (da < 9 && Math.abs(p.r - r) < 14) r -= 15;
+            if (da < 8 && Math.abs(p.r - r) < 10) r += 11;
           }
           placed.push({ ang, r });
           keep.add(dep.key);
@@ -99,11 +99,11 @@
             g = svg('g', { class: 'mark' }, marks);
             const inner = svg('g', { class: 'mark-inner' }, g);
             const len = String(dep.line.code).length;
-            const mw = len > 2 ? 9 + len * 4.6 : 14.8;
+            const mw = len > 2 ? 6 + len * 3.6 : 11;
             const st = BV.colors.chip(dep.line, ctx);
             if (st) g.classList.add('colored');
-            svg('rect', { x: -mw / 2, y: -7.4, width: mw, height: 14.8, rx: 7.4, class: 'mark-bg', style: st ? `fill:${st.bg}` : '' }, inner);
-            const t = svg('text', { class: 'mark-text', 'text-anchor': 'middle', 'dominant-baseline': 'central', y: 0.4, style: (len > 2 ? 'font-size:7px;' : '') + (st ? `fill:${st.fg}` : '') }, inner);
+            svg('rect', { x: -mw / 2, y: -5.5, width: mw, height: 11, rx: 5.5, class: 'mark-bg', style: st ? `fill:${st.bg}` : '' }, inner);
+            const t = svg('text', { class: 'mark-text', 'text-anchor': 'middle', 'dominant-baseline': 'central', y: 0.4, style: (len > 2 ? 'font-size:5.4px;' : '') + (st ? `fill:${st.fg}` : '') }, inner);
             t.textContent = dep.line.code;
             markEls.set(dep.key, g);
           }

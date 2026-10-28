@@ -56,7 +56,10 @@
         const sit = sits[idx] || null;
         const sev = sit ? (sit.severity === 'severe' || sit.severity === 'verySevere' ? 'severe' : 'normal') : 'none';
         root.dataset.severity = sev;
-        icon.innerHTML = sit ? ICON_WARN : ICON_OK;
+        const box = root.parentElement;
+        if (box) { box.classList.toggle('tr-normal', sev === 'normal'); box.classList.toggle('tr-severe', sev === 'severe'); }
+        const ic = sit ? ICON_WARN : ICON_OK;
+        if (icon._ic !== ic) { icon.innerHTML = ic; icon._ic = ic; }
         const id = sit ? sit.id : '__none';
         if (id !== shownId) { show(sit, shownId !== null); shownId = id; }
         // Prikker for flere meldinger

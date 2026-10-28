@@ -56,16 +56,23 @@
           });
       }
 
+      const ro = new ResizeObserver(entries => {
+        const r = entries[entries.length - 1].contentRect;
+        const cap = Math.max(1, Math.floor((r.height - 20) / ROW_PX));
+        const nt = r.width > 800 ? 3 : 2;
+        root.classList.toggle('narrow', r.width <= 800);
+        if (cap === capacity && nt === nTimes) return;
+        capacity = cap; nTimes = nt;
+        render(Date.now());
+      });
+      ro.observe(root);
+
       return {
         update(now) { render(now); },
         tick(now) { render(now); },
         restyle() { list.innerHTML = ''; list._bvMap = null; render(Date.now()); },
-        resize(geo) {
-          capacity = Math.max(1, Math.floor((geo.h - 20) / ROW_PX));
-          nTimes = geo.w > 800 ? 3 : 2;
-          root.classList.toggle('narrow', geo.w <= 800);
-          render(Date.now());
-        }
+        resize() { },
+        destroy() { ro.disconnect(); }
       };
     }
   };

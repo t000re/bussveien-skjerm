@@ -54,7 +54,11 @@ En trafikkmelding er «må vises». Når den kommer, krymper andre bokser eller 
 
 Prioritet, av/på og tillatte størrelser endres i innstillingspanelet. I redigeringsmodus (`E`) kan boksene dras og skaleres direkte, med snapping til rutenettet. En egen layout lagres for kombinasjonen av synlige bokser, så layouten med og uten trafikkmelding kan settes hver for seg. «Tilbake til automatisk» fjerner den.
 
-Fargemodus på linjene (Nøytral / Linjefarger / Dempet) og egne farger per linje stilles under Visning. Valgene lagres i nettleseren (localStorage).
+Fargemodus på linjene (Nøytral / Linjefarger / Dempet) og egne farger per linje stilles under Visning.
+
+Trasé viser tre stopp hver vei pluss start- og endeholdeplass (stiplet linje når det er skjulte stopp imellom).
+Stoppnavn kan stå rett eller skrått (45°). Boksen tegnes vertikalt når den er høyere enn den er bred,
+f.eks. 4×20 langs hele høyre kant. Valgene lagres i nettleseren (localStorage).
 
 ## Filer
 

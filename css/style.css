@@ -218,7 +218,7 @@ body.show-grid .box { box-shadow: inset 0 0 0 2px rgba(47, 124, 246, .55); }
 
 /* ---------- Klokke ---------- */
 .w-clock { overflow: hidden; }
-.clock-svg { position: absolute; left: 6%; top: 6%; width: 88%; height: 88%; overflow: visible; }
+.clock-svg { position: absolute; left: 4%; top: 4%; width: 92%; height: 92%; overflow: visible; }
 .clock-face { fill: #262626; }
 .tick { stroke: #8c8c8c; stroke-width: 1.4; stroke-linecap: round; }
 .tick.major { stroke: #ececec; stroke-width: 2.4; }
@@ -232,7 +232,7 @@ body.show-grid .box { box-shadow: inset 0 0 0 2px rgba(47, 124, 246, .55); }
 .clock-arc { fill: none; stroke: var(--green); stroke-width: 4; stroke-linecap: round; transition: opacity var(--dur-med); }
 .mark { transition: transform 1.2s var(--ease-soft), opacity 1s; }
 .mark-bg { fill: #3a3a3a; transition: fill var(--dur-med); }
-.mark-text { fill: #e6e6e6; font-size: 8.6px; font-weight: 650; transition: fill var(--dur-med); }
+.mark-text { fill: #e6e6e6; font-size: 6.6px; font-weight: 650; transition: fill var(--dur-med); }
 .mark.next .mark-bg { fill: var(--green); }
 .mark.next .mark-text { fill: #0d1a0e; }
 
@@ -271,8 +271,8 @@ body.show-grid .box { box-shadow: inset 0 0 0 2px rgba(47, 124, 246, .55); }
 .tr-dots { position: absolute; right: 26px; bottom: 20px; display: flex; gap: 8px; }
 .tr-dot { width: 9px; height: 9px; border-radius: 5px; background: #4a4a4a; transition: width var(--dur-med) var(--ease-soft), background-color var(--dur-med); }
 .tr-dot.on { width: 26px; background: var(--amber); }
-.box:has(.w-traffic[data-severity="normal"]) { box-shadow: inset 0 0 0 2px rgba(255, 181, 71, .32); background-color: #1c1813; }
-.box:has(.w-traffic[data-severity="severe"]) { box-shadow: inset 0 0 0 2px rgba(255, 107, 90, .38); background-color: #1e1412; }
+.box.tr-normal { box-shadow: inset 0 0 0 2px rgba(255, 181, 71, .32); background-color: #1c1813; }
+.box.tr-severe { box-shadow: inset 0 0 0 2px rgba(255, 107, 90, .38); background-color: #1e1412; }
 
 /* ---------- Trasé ---------- */
 .w-line { display: grid; }
@@ -421,7 +421,7 @@ kbd { background: #222; border: 1px solid #333; border-bottom-width: 2px; border
 }
 
 /* Fargemodus: neste avgang markeres med ring når skiltene har linjefarge */
-.mark.colored.next .mark-bg { stroke: #fff; stroke-width: 1.6; }
+.mark.colored.next .mark-bg { stroke: #fff; stroke-width: 1.2; }
 .bus.colored .bus-chip { stroke: none; }
 .bus.colored.next .bus-chip { stroke: #fff; stroke-width: 2.4; }
 .bus.colored.next .bus-stem { stroke: #fff; }
@@ -491,3 +491,15 @@ body.editing #stage { border-radius: 36px; box-shadow: 0 0 0 2px #1f1f1f; }
 .primary-btn { align-self: flex-start; border: 0; background: var(--blue); color: #fff; padding: 10px 16px; border-radius: 12px; font: inherit; font-weight: 600; cursor: pointer; }
 .primary-btn:hover { filter: brightness(1.1); }
 .manual-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; color: #cfcfcf; background: #172033; border: 1px solid #22385e; padding: 8px 12px; border-radius: 10px; }
+
+/* ---------- Trasé: endeholdeplasser, «du er her», piler, vertikal ---------- */
+.stop-label { paint-order: stroke; stroke: var(--card); stroke-width: 6px; stroke-linejoin: round; }
+.here-label { fill: #f2f2f2; }
+.you-sub { fill: #6fa5ff; font-weight: 600; paint-order: stroke; stroke: var(--card); stroke-width: 6px; }
+.term-label { fill: #d6d6d6; }
+.term-dot { fill: var(--card); stroke: var(--green-strong); stroke-width: 4; }
+.track.gap { stroke-dasharray: 0.1 16; stroke-linecap: round; }
+.bus-arrow { fill: #cfcfcf; transition: fill var(--dur-med); }
+.bus.next .bus-arrow { fill: var(--green); }
+.bus.on-line .bus-arrow { transform: translateY(0); }
+.bus.vertical .bus-chip { stroke-width: 1.6; }

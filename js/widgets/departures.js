@@ -36,15 +36,23 @@
           });
       }
 
+      // Antall rader følger boksens faktiske høyde mens den animerer, så rader kommer og går mykt
+      const ro = new ResizeObserver(entries => {
+        const h = entries[entries.length - 1].contentRect.height;
+        const cap = Math.max(1, Math.floor((h - PAD_PX * 2) / ROW_PX));
+        if (cap === capacity && root.style.getPropertyValue('--cap')) return;
+        capacity = cap;
+        root.style.setProperty('--cap', capacity);
+        render(Date.now());
+      });
+      ro.observe(root);
+
       return {
         update(now) { render(now); },
         tick(now) { render(now); },
         restyle() { list.querySelectorAll('.line-chip').forEach(c => c.remove()); list.innerHTML = ''; list._bvMap = null; render(Date.now()); },
-        resize(geo) {
-          capacity = Math.max(1, Math.floor((geo.h - PAD_PX * 2) / ROW_PX));
-          root.style.setProperty('--cap', capacity);
-          render(Date.now());
-        }
+        resize() { },
+        destroy() { ro.disconnect(); }
       };
     }
   };

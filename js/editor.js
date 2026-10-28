@@ -6,7 +6,7 @@
 (function (BV) {
   const app = BV.app;
   const M = app.metrics;
-  const MIN = { hero: [6, 6], departures: [4, 3], routes: [6, 2], clock: [3, 3], traffic: [4, 2], line: [6, 2] };
+  const MIN = { hero: [6, 6], departures: [4, 3], routes: [6, 2], clock: [3, 3], traffic: [4, 2], line: [3, 2] };
 
   let active = false;
   let drag = null;
@@ -138,16 +138,8 @@
       const hpx = Math.max(minH * M.ROW_H, drag.geo.h + dy);
       let w = clamp(Math.round((wpx + M.GAP) / pitchX), minW, M.COLS - o.x);
       let h = clamp(Math.round((hpx + M.GAP) / pitchY), minH, M.ROWS - o.y);
-      if (drag.id === 'hero') {
-        // Neste buss holdes (tilnærmet) kvadratisk
-        const s = Math.min(Math.max(w, h), M.COLS - o.x, M.ROWS - o.y);
-        w = s; h = s;
-        const px = Math.max(wpx, hpx);
-        b.el.style.width = b.el.style.height = Math.min(px, app.cellGeo({ x: 0, y: 0, w: s, h: s }).w + pitchX * 0.4) + 'px';
-      } else {
-        b.el.style.width = wpx + 'px';
-        b.el.style.height = hpx + 'px';
-      }
+      b.el.style.width = wpx + 'px';
+      b.el.style.height = hpx + 'px';
       cand = { id: drag.id, x: o.x, y: o.y, w, h };
     }
     const key = `${cand.x},${cand.y},${cand.w},${cand.h}`;

@@ -49,7 +49,7 @@ window.BV = window.BV || {};
       preset: 'skisse2',
       widgets: clone(PRESETS.skisse2.widgets),
       sim: { traffic: false, autoTraffic: true },
-      view: { grid: false, speed: 1, colorMode: 'neutral', busStops: 2 },
+      view: { grid: false, speed: 1, colorMode: 'neutral', busStops: 2, labelAngle: 'flat' },
       lineColors: {},
       manual: {}
     };
@@ -95,7 +95,7 @@ window.BV = window.BV || {};
     s.widgets.forEach(w => {
       const def = reg[w.id];
       if (!def) return;
-      if (!w.sizes || !w.sizes.length) w.sizes = def.sizes.slice();
+      if (!w.sizes || !w.sizes.length) w.sizes = (def.defaultSizes || def.sizes).slice();
       w.sizes = w.sizes.filter(x => def.sizes.includes(x));
       if (!w.sizes.length) w.sizes = def.sizes.slice();
       if (def.modes && !w.mode) w.mode = def.modes[0].id;
@@ -248,6 +248,10 @@ window.BV = window.BV || {};
         seg([{ id: 'neutral', label: 'Nøytral' }, { id: 'line', label: 'Linjefarger' }, { id: 'tint', label: 'Dempet' }],
           state.view.colorMode, v => { state.view.colorMode = v; changed('view'); render(); })),
       lineColorList(),
+      h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Stoppnavn i trasé'),
+        seg([{ id: 'flat', label: 'Rett' }, { id: 'angled', label: 'Skrå 45°' }],
+          state.view.labelAngle, v => { state.view.labelAngle = v; changed('view'); render(); })),
+      h('p', { class: 'hint' }, 'Trasé blir vertikal av seg selv når boksen er høyere enn den er bred, f.eks. 4×20. Skrå navn gjelder den liggende varianten.'),
       h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Vis busser i trasé fra'),
         seg([1, 2, 3].map(n => ({ id: n, label: n + ' stopp unna' })),
           state.view.busStops, v => { state.view.busStops = v; changed('view'); render(); })),

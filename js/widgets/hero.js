@@ -5,9 +5,9 @@
   BV.widgets.hero = {
     title: 'Neste buss',
     description: 'Stor nedtelling til neste avgang',
-    sizes: ['12x12', '12x10', '8x8'],
+    sizes: ['12x12', '12x10', '12x8', '8x8'],
+    defaultSizes: ['12x12', '12x10', '8x8'],
     required: true,
-    noStretch: true,
 
     available() { return { show: true, must: true }; },
 
