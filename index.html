@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="nb">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bussveien holdeplasskjerm</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="viewport">
+    <div id="stage">
+      <header id="topbar">
+        <div class="card topbar-stop">
+          <span id="stopName" class="stop-name">Kvaleberg skole</span>
+          <span id="quayBadge" class="quay-badge">A</span>
+          <span id="sourceBadge" class="source-badge" hidden>Demo</span>
+        </div>
+        <div class="card topbar-time"><span id="clockText">--:--</span></div>
+      </header>
+      <div id="grid"></div>
+      <div id="gridOverlay" hidden></div>
+    </div>
+  </div>
+
+  <button id="settingsButton" class="settings-button" title="Innstillinger (S)" aria-label="Innstillinger">
+    <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.3 7.3 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.3 7.3 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.3 7.3 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.3 7.3 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg>
+  </button>
+
+  <aside id="settings" aria-hidden="true"></aside>
+
+  <script src="js/anim.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/settings.js"></script>
+  <script src="js/widgets/hero.js"></script>
+  <script src="js/widgets/departures.js"></script>
+  <script src="js/widgets/routes.js"></script>
+  <script src="js/widgets/clock.js"></script>
+  <script src="js/widgets/traffic.js"></script>
+  <script src="js/widgets/line.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/editor.js"></script>
+</body>
+</html>
