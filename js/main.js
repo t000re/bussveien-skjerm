@@ -23,14 +23,21 @@
   let lastSig = null;
   let uid = 0;
 
-  function cellGeo(p) {
-    return {
+  // Klokkekortet oppe til høyre. Uten holdeplassnavn strekker boksene i øverste rad seg opp
+  // i toppfeltet, og klokken ligger som et utsnitt i hjørnet (med vanlig mellomrom rundt).
+  const CLOCK_LEFT = STAGE_W - PAD - 220;
+  function cellGeo(p, raw) {
+    const g = {
       x: PAD + p.x * (COL_W + GAP),
       y: GRID_TOP + p.y * (ROW_H + GAP),
       w: p.w * COL_W + (p.w - 1) * GAP,
       h: p.h * ROW_H + (p.h - 1) * GAP,
       cols: p.w, rows: p.h
     };
+    if (!raw && settings.view.showStopName === false && p.y === 0 && g.x < CLOCK_LEFT - GAP - 60) {
+      g.y = PAD; g.h += HEADER_H + GAP;
+    }
+    return g;
   }
 
   /* ---------- Skalering ---------- */
@@ -106,18 +113,20 @@
 
   function apply(placed, now, first) {
     const ids = new Set(placed.map(p => p.id));
-    const hadExit = [...boxes.keys()].some(id => !ids.has(id));
-    const dur = BV.anim.ms(1100);
+    const dur = BV.anim.ms(BV.anim.LAYOUT_MS);
 
     // Ut
     boxes.forEach((b, id) => {
       if (ids.has(id)) return;
       boxes.delete(id);
       b.el.classList.add('leaving');
+      // Glir ut nedover, under de andre boksene, mens de vokser inn i plassen
+      const drop = STAGE_H - (b.geo ? b.geo.y : 0) + 40;
       const a = b.el.animate([
-        { opacity: 1, scale: '1' },
-        { opacity: 0, scale: '0.94' }
-      ], { duration: dur * 0.45, easing: BV.anim.ease, fill: 'forwards' });
+        { translate: '0 0', opacity: 1 },
+        { translate: '0 ' + Math.round(drop * 0.7) + 'px', opacity: 1, offset: 0.7 },
+        { translate: '0 ' + drop + 'px', opacity: 0 }
+      ], { duration: dur, easing: 'cubic-bezier(.5,0,.25,1)', fill: 'forwards' });
       a.onfinish = () => { b.inst.destroy && b.inst.destroy(); b.el.remove(); };
     });
 
@@ -146,10 +155,16 @@
         el.getBoundingClientRect();
         el.style.transition = '';
         if (!first) {
-          el.animate([
-            { opacity: 0, scale: '0.94' },
-            { opacity: 1, scale: '1' }
-          ], { duration: dur * 0.8, easing: BV.anim.ease, delay: hadExit ? dur * 0.4 : dur * 0.3, fill: 'backwards' });
+          // Glir inn nedenfra, bak de andre boksene, samtidig som de krymper og gir plass.
+          // Samme fjær og varighet som resten av layouten, så alt beveger seg som én masse.
+          const rise = STAGE_H - geo.y + 40;
+          el.style.zIndex = '0';
+          const a = el.animate([
+            { translate: '0 ' + rise + 'px', opacity: 0 },
+            { opacity: 1, offset: 0.25 },
+            { translate: '0 0', opacity: 1 }
+          ], { duration: dur, easing: BV.anim.spring, fill: 'backwards' });
+          a.onfinish = () => { el.style.zIndex = ''; };
         } else {
           el.animate([
             { opacity: 0, translate: '0 40px' },
@@ -175,7 +190,7 @@
   function buildOverlay() {
     overlay.innerHTML = '';
     for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
-      const g = cellGeo({ x: c, y: r, w: 1, h: 1 });
+      const g = cellGeo({ x: c, y: r, w: 1, h: 1 }, true);
       const d = document.createElement('div');
       d.className = 'cell';
       d.style.cssText = `left:${g.x}px;top:${g.y}px;width:${g.w}px;height:${g.h}px`;
@@ -259,6 +274,8 @@
   function onSettingsChange(what) {
     if (what === 'view') {
       applyTheme();
+      document.body.classList.toggle('no-stopname', settings.view.showStopName === false);
+      relayout(true);
       BV.anim.applySpeed(settings.view.speed);
       document.body.classList.toggle('show-grid', settings.view.grid);
       overlay.hidden = !settings.view.grid;
@@ -317,6 +334,7 @@
   /* ---------- Start ---------- */
   BV.settings.init(settings, onSettingsChange);
   applyTheme();
+  document.body.classList.toggle('no-stopname', settings.view.showStopName === false);
   BV.anim.applySpeed(settings.view.speed);
   document.body.classList.toggle('show-grid', settings.view.grid);
   overlay.hidden = !settings.view.grid;

@@ -64,7 +64,7 @@ body.settings-open #stage { border-radius: 36px; box-shadow: 0 0 0 2px #1f1f1f, 
 
 /* ---------- Toppfelt ---------- */
 #topbar {
-  position: absolute; left: 24px; top: 24px; width: 1032px; height: 100px;
+  position: absolute; left: 24px; top: 24px; width: 1032px; height: 100px; z-index: 5; pointer-events: none;
   display: grid; grid-template-columns: 1fr 220px; gap: 16px;
 }
 .topbar-stop {
@@ -99,7 +99,7 @@ body.settings-open #stage { border-radius: 36px; box-shadow: 0 0 0 2px #1f1f1f, 
 /* ---------- Bento-bokser ---------- */
 #grid { position: absolute; inset: 0; }
 .box {
-  position: absolute; left: 0; top: 0;
+  position: absolute; left: 0; top: 0; z-index: 1;
   transition:
     transform var(--dur-layout) var(--ease-spring),
     width var(--dur-layout) var(--ease-spring),
@@ -109,11 +109,11 @@ body.settings-open #stage { border-radius: 36px; box-shadow: 0 0 0 2px #1f1f1f, 
   overflow: hidden;
   will-change: transform, width, height;
 }
-.box.leaving { z-index: 0; pointer-events: none; }
+.box.leaving { z-index: 0 !important; pointer-events: none; }
 .box-inner { position: absolute; inset: 0; container-type: size; }
 
 .prio-badge {
-  position: absolute; left: 12px; top: 12px; z-index: 5;
+  position: absolute; left: 56px; top: 14px; z-index: 5;
   padding: 6px 12px; border-radius: 10px;
   background: rgba(47, 124, 246, .92); color: #fff;
   font-size: 18px; font-weight: 600;
@@ -439,15 +439,25 @@ body.editing .prio-badge { opacity: 1; transform: none; }
   opacity: .94;
 }
 .rz {
-  position: absolute; right: 0; bottom: 0; width: 64px; height: 64px; z-index: 6;
-  cursor: nwse-resize; display: none; touch-action: none;
+  position: absolute; width: 64px; height: 64px; z-index: 6;
+  display: none; touch-action: none;
 }
 .rz::after {
-  content: ''; position: absolute; right: 14px; bottom: 14px; width: 22px; height: 22px;
-  border-right: 4px solid var(--blue); border-bottom: 4px solid var(--blue); border-bottom-right-radius: 10px;
-  opacity: .85; transition: transform .2s var(--ease-soft);
+  content: ''; position: absolute; width: 22px; height: 22px;
+  border: 0 solid var(--blue); opacity: .85; transition: transform .2s var(--ease-soft);
 }
-.rz:hover::after { transform: translate(3px, 3px); }
+.rz-se { right: 0; bottom: 0; cursor: nwse-resize; }
+.rz-se::after { right: 14px; bottom: 14px; border-right-width: 4px; border-bottom-width: 4px; border-bottom-right-radius: 10px; }
+.rz-sw { left: 0; bottom: 0; cursor: nesw-resize; }
+.rz-sw::after { left: 14px; bottom: 14px; border-left-width: 4px; border-bottom-width: 4px; border-bottom-left-radius: 10px; }
+.rz-ne { right: 0; top: 0; cursor: nesw-resize; }
+.rz-ne::after { right: 14px; top: 14px; border-right-width: 4px; border-top-width: 4px; border-top-right-radius: 10px; }
+.rz-nw { left: 0; top: 0; cursor: nwse-resize; }
+.rz-nw::after { left: 14px; top: 14px; border-left-width: 4px; border-top-width: 4px; border-top-left-radius: 10px; }
+.rz-se:hover::after { transform: translate(3px, 3px); }
+.rz-sw:hover::after { transform: translate(-3px, 3px); }
+.rz-ne:hover::after { transform: translate(3px, -3px); }
+.rz-nw:hover::after { transform: translate(-3px, -3px); }
 body.editing .rz { display: block; }
 .edit-ghost {
   position: absolute; left: 0; top: 0; z-index: 1; pointer-events: none;
@@ -503,3 +513,18 @@ body.editing #stage { border-radius: 36px; box-shadow: 0 0 0 2px #1f1f1f; }
 .color-row { display: flex; align-items: center; gap: 12px; }
 .color-row .field-label { flex: 1; }
 .color-row input[type="color"] { width: 44px; height: 30px; border: 1px solid #333; border-radius: 8px; background: none; padding: 2px; cursor: pointer; }
+
+/* ---------- Uten holdeplassnavn: klokken skjærer seg ned i boksen under ---------- */
+.topbar-stop, .topbar-time { pointer-events: auto; transition: opacity var(--dur-layout) var(--ease-soft), transform var(--dur-layout) var(--ease-spring), box-shadow var(--dur-layout) var(--ease-soft); }
+body.no-stopname .topbar-stop { opacity: 0; transform: translateY(-24px); pointer-events: none; }
+/* «Vollgrav» i bakgrunnsfargen rundt klokken holder mellomrommet til boksen under */
+body.no-stopname .topbar-time { box-shadow: 0 0 0 16px var(--bg); }
+/* Avrundede ytterhjørner der boksen møter utsnittet */
+.notch-corner {
+  position: absolute; width: 28px; height: 28px; z-index: 4; pointer-events: none; opacity: 0;
+  background: radial-gradient(circle at 0 100%, transparent 27.5px, var(--bg) 28px);
+  transition: opacity var(--dur-layout) var(--ease-soft);
+}
+.nc-a { left: 792px; top: 24px; }   /* venstre for klokken: 1080-24-220-16-28 */
+.nc-b { left: 1028px; top: 140px; } /* under klokken: 24+100+16 */
+body.no-stopname .notch-corner { opacity: 1; }

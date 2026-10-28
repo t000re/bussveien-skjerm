@@ -106,9 +106,15 @@
     const p = base.find(q => q.id === id);
     if (!p) return;
     e.preventDefault();
+    const rz = e.target.closest('.rz');
     drag = {
-      id, box, mode: e.target.closest('.rz') ? 'resize' : 'move',
-      start: toStage(e), geo: app.cellGeo(p), origin: { ...p },
+      id, box, mode: rz ? 'resize' : 'move',
+      // Hvilke kanter som flyttes: w/e (venstre/høyre) og n/s (topp/bunn)
+      west: !!rz && rz.dataset.c.includes('w'), north: !!rz && rz.dataset.c.includes('n'),
+      start: toStage(e),
+      geo: app.cellGeo(p),            // slik boksen vises (kan være strukket opp i toppfeltet)
+      raw: app.cellGeo(p, true),      // ren rutenettposisjon, brukes til snapping
+      origin: { ...p },
       base, layout: base, valid: true, key: ''
     };
     box.classList.add('dragging');
@@ -125,22 +131,32 @@
     const pitchX = M.COL_W + M.GAP, pitchY = M.ROW_H + M.GAP;
     let cand;
     if (drag.mode === 'move') {
-      const x = drag.geo.x + dx, y = drag.geo.y + dy;
-      b.el.style.transform = `translate(${x}px, ${y}px)`;
+      b.el.style.transform = `translate(${drag.geo.x + dx}px, ${drag.geo.y + dy}px)`;
       cand = {
         id: drag.id, w: o.w, h: o.h,
-        x: clamp(Math.round((x - M.PAD) / pitchX), 0, M.COLS - o.w),
-        y: clamp(Math.round((y - M.GRID_TOP) / pitchY), 0, M.ROWS - o.h)
+        x: clamp(Math.round((drag.raw.x + dx - M.PAD) / pitchX), 0, M.COLS - o.w),
+        y: clamp(Math.round((drag.raw.y + dy - M.GRID_TOP) / pitchY), 0, M.ROWS - o.h)
       };
     } else {
+      // Skalering fra hvilket som helst hjørne: motsatt kant står stille
       const [minW, minH] = MIN[drag.id] || [2, 2];
-      const wpx = Math.max(minW * M.COL_W, drag.geo.w + dx);
-      const hpx = Math.max(minH * M.ROW_H, drag.geo.h + dy);
-      let w = clamp(Math.round((wpx + M.GAP) / pitchX), minW, M.COLS - o.x);
-      let h = clamp(Math.round((hpx + M.GAP) / pitchY), minH, M.ROWS - o.y);
+      const minWpx = minW * M.COL_W, minHpx = minH * M.ROW_H;
+      const ddx = drag.west ? -dx : dx, ddy = drag.north ? -dy : dy;
+      const wpx = Math.max(minWpx, drag.geo.w + ddx);
+      const hpx = Math.max(minHpx, drag.geo.h + ddy);
+      const rawW = Math.max(minWpx, drag.raw.w + ddx), rawH = Math.max(minHpx, drag.raw.h + ddy);
+      const right = o.x + o.w, bottom = o.y + o.h;
+      let x = o.x, y = o.y, w, h;
+      if (drag.west) { x = clamp(right - Math.round((rawW + M.GAP) / pitchX), 0, right - minW); w = right - x; }
+      else w = clamp(Math.round((rawW + M.GAP) / pitchX), minW, M.COLS - o.x);
+      if (drag.north) { y = clamp(bottom - Math.round((rawH + M.GAP) / pitchY), 0, bottom - minH); h = bottom - y; }
+      else h = clamp(Math.round((rawH + M.GAP) / pitchY), minH, M.ROWS - o.y);
+      const px = drag.west ? drag.geo.x + drag.geo.w - wpx : drag.geo.x;
+      const py = drag.north ? drag.geo.y + drag.geo.h - hpx : drag.geo.y;
+      b.el.style.transform = `translate(${px}px, ${py}px)`;
       b.el.style.width = wpx + 'px';
       b.el.style.height = hpx + 'px';
-      cand = { id: drag.id, x: o.x, y: o.y, w, h };
+      cand = { id: drag.id, x, y, w, h };
     }
     const key = `${cand.x},${cand.y},${cand.w},${cand.h}`;
     if (key === drag.key) return;
@@ -187,10 +203,13 @@
   function refresh() {
     app.boxes.forEach(b => {
       if (!b.el.querySelector('.rz')) {
-        const rz = document.createElement('div');
-        rz.className = 'rz';
-        rz.title = 'Dra for å endre størrelse';
-        b.el.appendChild(rz);
+        ['nw', 'ne', 'sw', 'se'].forEach(c => {
+          const rz = document.createElement('div');
+          rz.className = 'rz rz-' + c;
+          rz.dataset.c = c;
+          rz.title = 'Dra for å endre størrelse';
+          b.el.appendChild(rz);
+        });
       }
     });
     const manual = !!app.current.manual;

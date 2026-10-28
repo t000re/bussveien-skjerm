@@ -226,6 +226,7 @@ window.BV = window.BV || {};
     const speedVal = h('span', { class: 'range-val' }, state.view.speed + '×');
     const card = state.view.cardColor || DEFAULT_CARD;
     body.append(section('Visning',
+      toggle(state.view.showStopName !== false, v => { state.view.showStopName = v; changed('view'); }, 'Vis holdeplassnavn'),
       toggle(state.view.grid, v => { state.view.grid = v; changed('view'); }, 'Vis rutenett (G)'),
       h('div', { class: 'color-row' },
         h('span', { class: 'field-label' }, 'Bakgrunn på boksene'),

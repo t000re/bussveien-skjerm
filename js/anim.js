@@ -7,10 +7,13 @@ window.BV = window.BV || {};
     const pts = [];
     const w0 = stiffness;
     const zeta = damping;
-    const wd = w0 * Math.sqrt(1 - zeta * zeta);
+    // Kritisk/overdempet fjær (zeta >= 1) har egen formel – ellers deler vi på null
+    const wd = zeta < 1 ? w0 * Math.sqrt(1 - zeta * zeta) : 0;
     for (let i = 0; i <= samples; i++) {
       const t = i / samples;
-      const v = 1 - Math.exp(-zeta * w0 * t) * (Math.cos(wd * t) + (zeta * w0 / wd) * Math.sin(wd * t));
+      const v = zeta < 1
+        ? 1 - Math.exp(-zeta * w0 * t) * (Math.cos(wd * t) + (zeta * w0 / wd) * Math.sin(wd * t))
+        : 1 - Math.exp(-w0 * t) * (1 + w0 * t);
       pts.push(+v.toFixed(4));
     }
     pts[pts.length - 1] = 1;
@@ -23,15 +26,16 @@ window.BV = window.BV || {};
 
   const anim = {
     speed: 1,
-    spring: supportsLinear ? springEasing(0.86, 8.5) : 'cubic-bezier(.2,.9,.25,1.05)',
+    spring: supportsLinear ? springEasing(0.8, 7.2, 60) : 'cubic-bezier(.2,.9,.25,1.05)',
     softSpring: supportsLinear ? springEasing(1, 7) : 'cubic-bezier(.22,1,.36,1)',
     ease: 'cubic-bezier(.22,1,.36,1)',
+    LAYOUT_MS: 800,
     ms(base) { return Math.round(base / anim.speed); },
 
     applySpeed(speed) {
       anim.speed = speed || 1;
       const root = document.documentElement.style;
-      root.setProperty('--dur-layout', anim.ms(1100) + 'ms');
+      root.setProperty('--dur-layout', anim.ms(anim.LAYOUT_MS) + 'ms');
       root.setProperty('--dur-med', anim.ms(600) + 'ms');
       root.setProperty('--dur-fast', anim.ms(350) + 'ms');
       root.setProperty('--ease-spring', anim.spring);
