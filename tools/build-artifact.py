@@ -11,7 +11,7 @@ css = css.replace("url('../fonts/inter-latin-wght-normal.woff2')", f"url(data:fo
 css = css.replace(':root {', ':root {\n  color-scheme: dark;', 1)
 
 def inline_script(m):
-    src = (root / m.group(1)).read_text(encoding='utf-8')
+    src = (root / m.group(1).split('?')[0]).read_text(encoding='utf-8')
     return '<script>\n' + src.replace('</script', '<\\/script') + '\n</script>'
 
 body = re.search(r'<body>(.*)</body>', html, re.S).group(1)

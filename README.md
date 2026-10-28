@@ -82,3 +82,7 @@ Se en av de eksisterende boksene.
 `python3 tools/build-artifact.py` samler alt i `dist/bussveien.html`, som publiseres som privat side på claude.ai.
 Den siden kan ikke kalle Entur (nettleserens sikkerhetsregler for artifacts), så den viser alltid demodata.
 Kjør lokalt for live Entur-data.
+
+## Oppdateringer
+
+Kjør `python3 tools/bump-version.py` før hver commit som skal ut. Det gir filene nye adresser (så nettlesere ikke viser gamle kopier), og skjermer som står åpne, laster seg selv på nytt innen ett minutt.

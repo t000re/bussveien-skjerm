@@ -316,6 +316,23 @@
   refreshData();
   setTimeout(loop, 1000 - (Date.now() % 1000) + 5);
 
+  /* ---------- Automatisk oppdatering ----------
+     Sjekker version.json hvert minutt. Er det publisert en ny versjon, lastes siden på nytt,
+     slik at skjermene alltid viser siste utgave uten at noen trenger å gjøre noe. */
+  function watchVersion() {
+    if (!/^https?:/.test(location.protocol) || window.BV_VERSION === 'dev') return;
+    setInterval(async () => {
+      if (BV.editor && BV.editor.active) return;
+      try {
+        const res = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+        if (!res.ok) return;
+        const { version } = await res.json();
+        if (version && version !== window.BV_VERSION) location.reload();
+      } catch (e) { /* offline: prøv igjen senere */ }
+    }, 60000);
+  }
+  watchVersion();
+
   BV.app = {
     settings, ctx, relayout, boxes, cellGeo, setGeo, apply, fitStage,
     stage, grid,
