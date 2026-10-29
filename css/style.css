@@ -306,6 +306,8 @@ body.show-grid .box { box-shadow: inset 0 0 0 2px rgba(47, 124, 246, .55); }
 .track { fill: none; stroke: var(--line-track); stroke-width: 10; stroke-linecap: round; }
 .track.tail { stroke-linecap: butt; }
 .stop-dot { fill: #d9d9d9; stroke: var(--card); stroke-width: 4; }
+/* Ensfarget linje: stoppene i samme grønne som sporet, skilt fra det med en ring i kortfargen */
+.line-svg.mono .stop-dot { fill: var(--line-track); }
 .stop-label { fill: var(--muted); font-weight: 500; font-family: inherit; }
 .you-label { fill: #e8e8e8; font-weight: 600; }
 .you-ring { fill: #fff; }

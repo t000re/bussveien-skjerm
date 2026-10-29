@@ -276,6 +276,10 @@
           trackScale = Math.max(0.45, Math.min(0.8, est / 60));
         }
         const lanes = Math.max(m.up.lanes, m.down.lanes, 1);
+        // To endeholdeplasser på samme side: navnet over den øverste og under den nederste
+        // prikken i stedet for ved siden av – sparer bredde og gir mer luft
+        const stacked = sm => !vertical && !angled && sm.terms.length === 2;
+        const stackTop = stacked(m.up) || stacked(m.down);
         const forked = lanes > 1;
         // Grener med synlige stopp over hovedlinjen får navnene sine over
         const topLabels = [m.up, m.down].some(sm => sm.branches.some((b, bi) => sm.branchLane(bi) > 0));
@@ -307,7 +311,7 @@
             above = topLabels ? widest(topNames) * Math.SQRT1_2 + 26 : (forked ? 26 : 62);
           } else {
             below = (compact ? 30 : 38) + 2 * fs + 6;
-            above = topLabels ? (compact ? 20 : 24) + fs + 8 : (forked ? 26 : 62);
+            above = topLabels || stackTop ? (compact ? 20 : 24) + fs + 8 : (forked ? 26 : 62);
           }
           const minAbove = topLabels ? 40 : (forked ? 24 : 58), minBelow = angled ? 60 : below;
           let dyPref = 58;
@@ -338,7 +342,8 @@
           const hasTerm = sm.terms.length > 0;
           const stub = !hasTerm && sm.ends.some(e => e.hidden);
           const name = hasTerm && !vertical ? Math.min(240, Math.max(...sm.terms.map(t => wrapName(t.name, fs, 600).width))) : 0;
-          return { hasTerm, stub, multi: sm.terms.length > 1, flex: hasTerm || stub, reserve: hasTerm ? (vertical ? 4 : r + 10 + name) : 0, n: visCount(sm) };
+          const reserve = !hasTerm ? 0 : vertical ? 4 : stacked(sm) ? r + 4 + name * 0.3 : r + 10 + name;
+          return { hasTerm, stub, multi: sm.terms.length > 1, flex: hasTerm || stub, reserve, n: visCount(sm) };
         };
         const sUp = sideInfo(m.up), sDown = sideInfo(m.down);
         const minGap = angled || vertical ? 56 : 40;
@@ -385,7 +390,7 @@
         const strokeOf = code => BV.colors.stroke(code, (lineInfo.get(code) || {}).color, ctx);
         const allLines = m.patterns.map(p => p.lineCode);
 
-        const frag = svg('svg', { viewBox: `0 0 ${W} ${H}`, class: 'line-svg' + (vertical ? ' vertical' : '') + (ov ? ' ov' : '') });
+        const frag = svg('svg', { viewBox: `0 0 ${W} ${H}`, class: 'line-svg' + (vertical ? ' vertical' : '') + (ov ? ' ov' : '') + (colored ? '' : ' mono') });
         const tracks = svg('g', { class: 'tracks' }, frag);
         const dots = svg('g', { class: 'dots' }, frag);
         const labels = svg('g', { class: 'labels' }, frag);
@@ -449,8 +454,17 @@
         }
 
         // Endeholdeplass: vannrett navn ved siden av prikken, linjenummer mellom prikk og navn
-        function termLabel(p, tm, dir, room) {
+        function termLabel(p, tm, dir, room, pos) {
           const P = map(p.a, p.o);
+          if (pos) {
+            // Over eller under prikken, som de vanlige stoppnavnene. Navnet slutter ved boksens
+            // kant og strekker seg innover, men ikke inn i navnet på siste stopp.
+            const y = pos === 'above' ? P.y - (compact ? 20 : 24) : P.y + (compact ? 30 : 38);
+            const x = dir > 0 ? Math.max(W - EDGE, P.x + r) : Math.min(EDGE, P.x - r);
+            const t = svg('text', { x, y, class: 'stop-label term-label', 'text-anchor': dir > 0 ? 'end' : 'start', 'font-size': fs }, labels);
+            setFit(t, tm.name, fs, Math.max(40, room), 600, fitMode);
+            return;
+          }
           const sideDir = vertical ? 1 : dir;
           const x = P.x + sideDir * (r + 10);
           if (vertical) room = C - x - EDGE;
@@ -525,7 +539,11 @@
             });
             const P = map(p.a, p.o);
             svg('circle', { cx: P.x, cy: P.y, r: r + 1, class: 'term-dot' }, dots);
-            termLabel(p, tm, dir, nameRoom(dir));
+            if (stacked(sm)) {
+              const lastA = pts.reduce((m, q) => dir > 0 ? Math.max(m, q.a) : Math.min(m, q.a), aC);
+              const room = (dir > 0 ? L - EDGE - lastA : lastA - EDGE) - slot * 0.47 - 14;
+              termLabel(p, tm, dir, room, tm.lane === Math.max(...sm.terms.map(x => x.lane)) ? 'above' : 'below');
+            } else termLabel(p, tm, dir, nameRoom(dir));
           });
 
           pts.forEach(p => {
@@ -685,7 +703,7 @@
           keep.add(j.journeyId);
           let g = busEls.get(j.journeyId), fresh = false;
           if (!g) { g = makeBus(j); busEls.set(j.journeyId, g); fresh = true; }
-          items.push({ j, g, pos, fresh, a: pos.a });
+          items.push({ j, g, pos, fresh, a: pos.a, at: j.calls[k].time });
         });
 
         // Kollisjonsmargin: merker på samme spor skyves fra hverandre langs linjen (rekkefølgen beholdes)
@@ -722,6 +740,13 @@
           g.style.opacity = pos.fade;
           g.classList.toggle('next', j.journeyId === nextKey);
         });
+        // Nærmeste buss øverst: busser som har passert legges bakerst, deretter de som kommer,
+        // med den som er her først til slutt (tegnes over de andre)
+        const rank = it => it.at < now ? -Infinity : -it.at;
+        const order = [...items].sort((x, y) => rank(x) - rank(y)).map(it => it.g);
+        const current = [...busLayer.children].filter(g => order.includes(g));
+        // Flytt bare når rekkefølgen faktisk er feil (flytting i DOM avbryter overgangen)
+        if (order.some((g, i) => current[i] !== g)) order.forEach(g => busLayer.appendChild(g));
         busEls.forEach((g, id) => {
           if (keep.has(id)) return;
           busEls.delete(id);
