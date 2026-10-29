@@ -63,14 +63,20 @@
             setLineChip(pill.children[0].firstChild, g.line, ctx);
             pill.children[1].textContent = g.dest;
             setTime(pill.children[2], g.deps[0], now, isNew);
+            // Alltid like mange felt i hver rad; mangler det avganger, står feltet tomt
             const rest = g.deps.slice(1, nTimes);
-            while (row.children.length - 1 < rest.length) {
+            while (row.children.length < nTimes) {
               const seg = el('div', 'route-seg route-next');
               seg.append(timeBlock());
               row.append(seg);
             }
-            while (row.children.length - 1 > rest.length) row.lastChild.remove();
-            rest.forEach((d, k) => setTime(row.children[k + 1].firstChild, d, now, isNew));
+            while (row.children.length > nTimes) row.lastChild.remove();
+            for (let k = 1; k < nTimes; k++) {
+              const t = row.children[k].firstChild;
+              const d = rest[k - 1];
+              t.classList.toggle('empty', !d);
+              if (d) setTime(t, d, now, isNew);
+            }
           });
       }
 

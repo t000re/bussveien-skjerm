@@ -579,3 +579,4 @@ body.no-stopname .topbar-stop { opacity: 0; transform: translateY(-24px); pointe
 .route-time { width: 2.7em; min-width: 0; }
 .route-time.no-unit .t-num { font-size: .82em; letter-spacing: -0.02em; }
 .route-next { flex: 0 0 auto; padding: 0 .55em 0 calc(var(--seg-r) + .55em); }
+.route-time.empty { visibility: hidden; }
