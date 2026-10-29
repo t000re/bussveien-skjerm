@@ -44,11 +44,12 @@
         }
         BV.anim.keyedList(list, gs, g => g.key,
           () => {
+            // Hovedavgangen ligger øverst; de neste avgangene er egne bokser som stikker
+            // fram bak den, hver med skygge fra boksen foran.
             const row = el('div', 'route-row');
-            const pill = el('div', 'route-pill');
-            pill.append(lineChip({ code: '' }, ctx, 'md'), el('span', 'route-dest'), el('span', 'route-first'));
-            const more = el('div', 'route-more');
-            row.append(pill, more);
+            const pill = el('div', 'route-seg route-pill');
+            pill.append(lineChip({ code: '' }, ctx, 'md'), el('span', 'route-dest'), timeBlock());
+            row.append(pill);
             return row;
           },
           (g, row, isNew, i) => {
@@ -56,13 +57,33 @@
             const pill = row.children[0];
             setLineChip(pill.children[0], g.line, ctx);
             pill.children[1].textContent = g.dest;
-            BV.anim.swapText(pill.children[2], BV.fmt.departure(g.deps[0], now, 60), { instant: isNew });
-            const more = row.children[1];
+            setTime(pill.children[2], g.deps[0], now, isNew);
             const rest = g.deps.slice(1, nTimes);
-            while (more.children.length < rest.length) more.append(el('span', 'route-time'));
-            while (more.children.length > rest.length) more.lastChild.remove();
-            rest.forEach((d, i) => BV.anim.swapText(more.children[i], BV.fmt.departure(d, now, 60), { instant: isNew }));
+            while (row.children.length - 1 < rest.length) {
+              const seg = el('div', 'route-seg route-next');
+              seg.append(timeBlock());
+              row.append(seg);
+            }
+            while (row.children.length - 1 > rest.length) row.lastChild.remove();
+            rest.forEach((d, k) => setTime(row.children[k + 1].firstChild, d, now, isNew));
           });
+      }
+
+      function timeBlock() {
+        const t = el('span', 'route-time');
+        t.append(el('span', 't-num'), el('span', 't-unit'));
+        return t;
+      }
+      // Stort tall med «min» under; «Nå» alene; klokkeslett når det er over en time til
+      function setTime(t, dep, now, instant) {
+        const diff = dep.expected - now;
+        let n, u;
+        if (diff < 60000) { n = 'Nå'; u = ''; }
+        else if (diff < 60 * 60000) { n = String(Math.floor(diff / 60000)); u = 'min'; }
+        else { n = BV.fmt.hhmm(dep.expected); u = ''; }
+        t.classList.toggle('no-unit', !u);
+        BV.anim.swapText(t.children[0], n, { instant });
+        BV.anim.swapText(t.children[1], u || '\u00a0', { instant });
       }
 
       const ro = new ResizeObserver(entries => {
