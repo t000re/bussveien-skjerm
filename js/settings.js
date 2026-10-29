@@ -24,6 +24,8 @@ window.BV = window.BV || {};
       [L('hero', 0, 0, 12, 14), L('departures', 0, 14, 12, 6)]),
     p4: preset('Per rute', ['hero', 'routes'],
       [L('hero', 0, 0, 12, 15), L('routes', 0, 15, 12, 5)], { routes: { mode: 'always' } }),
+    p5: preset('Per rute og trasé', ['hero', 'routes', 'line'],
+      [L('hero', 0, 0, 12, 12), L('routes', 0, 12, 12, 5), L('line', 0, 17, 12, 3)], { routes: { mode: 'always' } }),
     skisse1: {
       label: 'Skisse 1', hint: 'Liste, klokke og trafikk',
       widgets: [
@@ -337,7 +339,7 @@ window.BV = window.BV || {};
 
   function keysList() {
     const dl = h('dl', { class: 'keys' });
-    [['S', 'Innstillinger'], ['1–4', 'Oppsett 1–4'], ['E', 'Rediger layout (dra og skaler bokser)'], ['T', 'Trafikkmelding av/på'], ['G', 'Rutenett og prioritet'], ['F', 'Fullskjerm'], ['Esc', 'Lukk innstillinger']]
+    [['S', 'Innstillinger'], ['1–5', 'Oppsett 1–5'], ['E', 'Rediger layout (dra og skaler bokser)'], ['T', 'Trafikkmelding av/på'], ['G', 'Rutenett og prioritet'], ['F', 'Fullskjerm'], ['Esc', 'Lukk innstillinger']]
       .forEach(([k, v]) => dl.append(h('dt', {}, h('kbd', {}, k)), h('dd', {}, v)));
     return dl;
   }

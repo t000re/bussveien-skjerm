@@ -551,11 +551,11 @@ body.no-stopname .topbar-stop { opacity: 0; transform: translateY(-24px); pointe
 .line-svg.ov .stop-label { stroke-width: 4px; }
 
 /* Oppsett-miniatyrer øverst i innstillingene */
-.preset-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.preset-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
 .preset-thumb {
   display: flex; flex-direction: column; align-items: center; gap: 8px;
-  padding: 10px 6px 8px; border-radius: 14px; border: 1.5px solid #262626; background: #161616;
-  color: #bbb; font: inherit; font-size: 12px; cursor: pointer; transition: border-color .2s, background-color .2s;
+  padding: 10px 4px 8px; border-radius: 14px; border: 1.5px solid #262626; background: #161616;
+  color: #bbb; font: inherit; font-size: 11px; line-height: 1.2; text-align: center; cursor: pointer; transition: border-color .2s, background-color .2s;
 }
 .preset-thumb:hover { border-color: #3a3a3a; }
 .preset-thumb.on { border-color: var(--blue); background: #141c2b; color: #fff; }

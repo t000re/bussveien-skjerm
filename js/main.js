@@ -346,7 +346,7 @@
     else if (k === 't') { settings.sim.traffic = !settings.sim.traffic; BV.settings.changed('sim'); BV.settings.refresh(); }
     else if (k === 'g') { settings.view.grid = !settings.view.grid; BV.settings.changed('view'); BV.settings.refresh(); }
     else if (k === 'f') { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => { }); }
-    else if (['1', '2', '3', '4'].includes(k)) BV.settings.applyPreset('p' + k);
+    else if (['1', '2', '3', '4', '5'].includes(k)) BV.settings.applyPreset('p' + k);
   });
 
   let idleTimer;
