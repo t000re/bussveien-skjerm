@@ -46,7 +46,7 @@
         root.classList.toggle('simple', simple);
         // Merkestørrelse og antall per variant
         cfg = simple
-          ? { max: 3, h: 21, font: 11.5, r: 66, step: 23, hourLen: 36, minLen: 66 }
+          ? { max: 4, h: 20, font: 11.5, r: 80, step: 0, hourLen: 38, minLen: 62 }
           : { max: 99, h: 11, font: 6.6, r: R_MARK, step: 12, hourLen: 44, minLen: 74 };
         s.innerHTML = '';
         markEls.clear();
@@ -55,7 +55,7 @@
         if (simple) {
           // Bare fire prikker for kvartene
           for (let i = 0; i < 4; i++) {
-            const [x, y] = polar(i * 90, R_FACE - 9);
+            const [x, y] = polar(i * 90, 80);
             svg('circle', { cx: x, cy: y, r: 2.6, class: 'tick-dot' }, ticks);
           }
         } else {
@@ -73,13 +73,13 @@
           }
         }
         // Enkel: svak ring der minuttviserens spiss og linjeskiltene møtes
-        if (simple) svg('circle', { cx: C, cy: C, r: cfg.r, class: 'clock-track' }, s);
         arc = svg('path', { class: 'clock-arc', d: '' }, s);
+        if (simple) arc.style.display = 'none';   // enkel: det grønne skiltet viser neste buss
         hourHand = svg('line', { x1: C, y1: C + 8, x2: C, y2: C - cfg.hourLen, class: 'hand hour' }, s);
         minHand = svg('line', { x1: C, y1: C + 10, x2: C, y2: C - cfg.minLen, class: 'hand minute' }, s);
         // Enkel: syltynn guloransje sekundviser med motvekt, i Braun-stil
         secHand = simple
-          ? svg('line', { x1: C, y1: C + 18, x2: C, y2: C - 82, class: 'hand second braun' }, s)
+          ? svg('line', { x1: C, y1: C + 16, x2: C, y2: C - 62, class: 'hand second braun' }, s)
           : svg('line', { x1: C, y1: C + 14, x2: C, y2: C - 80, class: 'hand second' }, s);
         svg('circle', { cx: C, cy: C, r: 3.6, class: 'hand-hub' }, s);
         svg('circle', { cx: C, cy: C, r: simple ? 2 : 1.4, class: 'hand-hub-in' + (simple ? ' braun' : '') }, s);
@@ -119,8 +119,7 @@
         const items = [];
         deps.forEach(dep => {
           const last = items[items.length - 1];
-          if (mode === 'simple' && last && dep.expected - last.deps[0].expected < 2 * 60000) last.deps.push(dep);
-          else items.push({ deps: [dep] });
+          items.push({ deps: [dep] });
         });
         items.forEach(it => { it.key = it.deps.map(d => d.key).join('+'); });
         const placed = [];
@@ -159,6 +158,11 @@
             });
             markEls.set(it.key, g);
           }
+          // Ligger merket nesten helt under en tidligere buss, vises bare kanten (ikke teksten)
+          if (mode === 'simple') {
+            const covered = placed.slice(0, -1).some(p => { let da = Math.abs(p.ang - ang); if (da > 180) da = 360 - da; return da < 11; });
+            if (g) g.classList.toggle('covered', covered);
+          }
           const [x, y] = polar(ang, r);
           g.style.transform = `translate(${x}px, ${y}px)`;
           g.classList.toggle('next', i === 0);
@@ -170,6 +174,8 @@
               { duration: BV.anim.ms(700), easing: BV.anim.spring });
           }
         });
+        // Nærmeste buss øverst: senere merker legges bak, så de «glir inn under»
+        for (let i = items.length - 1; i >= 0; i--) { const g = markEls.get(items[i].key); if (g) marks.appendChild(g); }
         markEls.forEach((g, k) => {
           if (keep.has(k)) return;
           markEls.delete(k);

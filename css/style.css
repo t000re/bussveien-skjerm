@@ -594,3 +594,10 @@ body.no-stopname .topbar-stop { opacity: 0; transform: translateY(-24px); pointe
 .w-clock.simple .mark.next .mark-bg.later { fill: #3d3d3d; }
 .w-clock .mark.colored.next .mark-bg.later { stroke: none; }
 .w-clock .mark.next .mark-text.later { fill: #e6e6e6; }
+/* Enkel klokke, versjon 2: grå visere som slutter før skiltene, skilt med 2 px kant mot urskiven */
+.w-clock.simple .hand.hour { stroke: #9a9a9a; stroke-width: 6; }
+.w-clock.simple .hand.minute { stroke: #9a9a9a; stroke-width: 3.6; }
+.w-clock.simple .hand-hub { fill: #9a9a9a; r: 3; }
+.w-clock.simple .mark-bg { stroke: #262626; stroke-width: 1.4; paint-order: stroke; }
+.w-clock.simple .tick-dot { fill: #6a6a6a; }
+.w-clock.simple .mark.covered .mark-text { opacity: 0; }
