@@ -446,7 +446,7 @@ kbd { background: #222; border: 1px solid #333; border-bottom-width: 2px; border
 }
 
 /* Fargemodus: neste avgang markeres med ring når skiltene har linjefarge */
-.mark.colored.next .mark-bg { stroke: #fff; stroke-width: 1.2; }
+
 .bus.colored .bus-chip { stroke: none; }
 .bus.colored.next .bus-chip { stroke: #fff; stroke-width: 2.4; }
 .bus.colored.next .bus-stem { stroke: #fff; }
@@ -598,6 +598,8 @@ body.no-stopname .topbar-stop { opacity: 0; transform: translateY(-24px); pointe
 .w-clock.simple .hand.hour { stroke: #9a9a9a; stroke-width: 6; }
 .w-clock.simple .hand.minute { stroke: #9a9a9a; stroke-width: 3.6; }
 .w-clock.simple .hand-hub { fill: #9a9a9a; r: 3; }
-.w-clock.simple .mark-bg { stroke: #262626; stroke-width: 1.4; paint-order: stroke; }
+.w-clock.simple .mark-bg { stroke: #262626; stroke-width: 2.6; paint-order: stroke; }
 .w-clock.simple .tick-dot { fill: #6a6a6a; }
 .w-clock.simple .mark.covered .mark-text { opacity: 0; }
+.w-clock .mark.colored.next .mark-bg { stroke: none; }
+.w-clock.simple .mark.colored.next .mark-bg { stroke: #262626; }

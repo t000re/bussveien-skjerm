@@ -46,7 +46,7 @@
         root.classList.toggle('simple', simple);
         // Merkestørrelse og antall per variant
         cfg = simple
-          ? { max: 4, h: 20, font: 11.5, r: 80, step: 0, hourLen: 38, minLen: 62 }
+          ? { max: 4, h: 20, font: 11.5, r: 78, edge: R_FACE - 4, step: 0, hourLen: 36, minLen: 56 }
           : { max: 99, h: 11, font: 6.6, r: R_MARK, step: 12, hourLen: 44, minLen: 74 };
         s.innerHTML = '';
         markEls.clear();
@@ -55,7 +55,7 @@
         if (simple) {
           // Bare fire prikker for kvartene
           for (let i = 0; i < 4; i++) {
-            const [x, y] = polar(i * 90, 80);
+            const [x, y] = polar(i * 90, 78);
             svg('circle', { cx: x, cy: y, r: 2.6, class: 'tick-dot' }, ticks);
           }
         } else {
@@ -79,7 +79,7 @@
         minHand = svg('line', { x1: C, y1: C + 10, x2: C, y2: C - cfg.minLen, class: 'hand minute' }, s);
         // Enkel: syltynn guloransje sekundviser med motvekt, i Braun-stil
         secHand = simple
-          ? svg('line', { x1: C, y1: C + 16, x2: C, y2: C - 62, class: 'hand second braun' }, s)
+          ? svg('line', { x1: C, y1: C + 16, x2: C, y2: C - 56, class: 'hand second braun' }, s)
           : svg('line', { x1: C, y1: C + 14, x2: C, y2: C - 80, class: 'hand second' }, s);
         svg('circle', { cx: C, cy: C, r: 3.6, class: 'hand-hub' }, s);
         svg('circle', { cx: C, cy: C, r: simple ? 2 : 1.4, class: 'hand-hub-in' + (simple ? ' braun' : '') }, s);
@@ -156,7 +156,16 @@
               t.textContent = d.line.code;
               x0 += w + gap;
             });
+            g._hw = (sizes.reduce((a, z) => a + z.w, 0) + gap * (sizes.length - 1)) / 2;
+            g._hh = H / 2;
             markEls.set(it.key, g);
+          }
+          // Enkel: skiltets ytterkant skal ligge inntil urskivens kant, uansett bredde og retning
+          if (mode === 'simple') {
+            const t = (ang - 90) * Math.PI / 180;
+            const ext = Math.abs(Math.cos(t)) * g._hw + Math.abs(Math.sin(t)) * g._hh;
+            r = Math.min(cfg.r, cfg.edge - ext);
+            placed[placed.length - 1].r = r;
           }
           // Ligger merket nesten helt under en tidligere buss, vises bare kanten (ikke teksten)
           if (mode === 'simple') {
