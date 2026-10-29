@@ -42,20 +42,25 @@
           root.style.setProperty('--rgap', gap + 'px');
           root.style.setProperty('--rowh', Math.min(rowH, 180) + 'px');
         }
+        const longest = Math.max(1, ...gs.map(g => String(g.line.code).length));
+        root.style.setProperty('--chipw', (longest > 2 ? 0.9 + longest * 0.62 : 1.6) + 'em');
         BV.anim.keyedList(list, gs, g => g.key,
           () => {
             // Hovedavgangen ligger øverst; de neste avgangene er egne bokser som stikker
             // fram bak den, hver med skygge fra boksen foran.
             const row = el('div', 'route-row');
             const pill = el('div', 'route-seg route-pill');
-            pill.append(lineChip({ code: '' }, ctx, 'md'), el('span', 'route-dest'), timeBlock());
+            // Linjeskiltet står i en kolonne med fast bredde, så destinasjonene starter likt
+            const slot = el('span', 'chip-slot');
+            slot.append(lineChip({ code: '' }, ctx, 'md'));
+            pill.append(slot, el('span', 'route-dest'), timeBlock());
             row.append(pill);
             return row;
           },
           (g, row, isNew, i) => {
             row.classList.toggle('first', i === 0);
             const pill = row.children[0];
-            setLineChip(pill.children[0], g.line, ctx);
+            setLineChip(pill.children[0].firstChild, g.line, ctx);
             pill.children[1].textContent = g.dest;
             setTime(pill.children[2], g.deps[0], now, isNew);
             const rest = g.deps.slice(1, nTimes);

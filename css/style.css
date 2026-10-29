@@ -573,3 +573,9 @@ body.no-stopname .topbar-stop { opacity: 0; transform: translateY(-24px); pointe
 .preset-thumb.colored .th-chip.c0 { fill: #f4a582; }
 .preset-thumb.colored .th-chip.c1 { fill: #2b7bd6; }
 .preset-thumb.colored .th-chip.c2 { fill: #d6336c; }
+
+/* Avganger per rute: faste kolonner, så tidene står på linje i alle rader */
+.route-pill .chip-slot { flex: 0 0 var(--chipw, 1.6em); display: flex; align-items: center; }
+.route-time { width: 2.7em; min-width: 0; }
+.route-time.no-unit .t-num { font-size: .82em; letter-spacing: -0.02em; }
+.route-next { flex: 0 0 auto; padding: 0 .55em 0 calc(var(--seg-r) + .55em); }
