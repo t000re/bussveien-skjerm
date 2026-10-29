@@ -28,7 +28,7 @@ Scenen er alltid 1080 × 1920 og skaleres til vinduet, så den ser lik ut på en
 | `E` | Rediger layout: dra bokser for å flytte, dra hjørnet for å endre størrelse |
 | `T` | Simuler trafikkmelding av/på |
 | `G` | Vis rutenett og prioritet på boksene |
-| `1` `2` `3` | Oppsett fra skisse 1–3 |
+| `1`–`4` | Oppsett 1–4 (Liste og trasé, Med klokke, Liste, Per rute) |
 | `F` | Fullskjerm |
 
 URL-parametre: `?quay=NSR:Quay:12345`, `?source=demo|entur|auto`, `?preset=skisse1|skisse2|skisse3`.

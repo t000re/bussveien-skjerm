@@ -6,7 +6,24 @@ window.BV = window.BV || {};
   const DEFAULT_CARD = '#171717';
 
   // Rekkefølgen her er prioriteten. sizes = tillatte størrelser (største først).
+  // Oppsettene øverst i innstillingene. layout = egen layout (12 × 20 ruter) for akkurat
+  // denne kombinasjonen av bokser; kommer det en trafikkmelding, tar den automatiske
+  // layouten over. Alle skjuler holdeplassnavnet, så klokken ligger i hjørnet.
+  const L = (id, x, y, w, h) => ({ id, x, y, w, h });
+  const rest = ids => ['hero', 'departures', 'routes', 'clock', 'line'].filter(id => !ids.includes(id)).map(id => ({ id, enabled: false }));
+  const preset = (label, ids, layout, extra = {}) => ({
+    label, show: true, layout,
+    widgets: [...ids.map(id => ({ id, enabled: true, ...(extra[id] || {}) })), { id: 'traffic', enabled: true, mode: 'message' }, ...rest(ids)]
+  });
   const PRESETS = {
+    p1: preset('Liste og trasé', ['hero', 'departures', 'line'],
+      [L('hero', 0, 0, 12, 12), L('departures', 0, 12, 12, 5), L('line', 0, 17, 12, 3)]),
+    p2: preset('Med klokke', ['hero', 'departures', 'clock', 'line'],
+      [L('hero', 0, 0, 12, 11), L('departures', 0, 11, 6, 6), L('clock', 6, 11, 6, 6), L('line', 0, 17, 12, 3)]),
+    p3: preset('Liste', ['hero', 'departures'],
+      [L('hero', 0, 0, 12, 14), L('departures', 0, 14, 12, 6)]),
+    p4: preset('Per rute', ['hero', 'routes'],
+      [L('hero', 0, 0, 12, 15), L('routes', 0, 15, 12, 5)], { routes: { mode: 'always' } }),
     skisse1: {
       label: 'Skisse 1', hint: 'Liste, klokke og trafikk',
       widgets: [
@@ -156,6 +173,15 @@ window.BV = window.BV || {};
         h('h2', {}, 'Innstillinger'),
         h('button', { class: 'icon-btn', title: 'Lukk (Esc)', onclick: () => toggleOpen(false) }, '✕')),
       body);
+
+    // Oppsett
+    const colorsOn = state.view.colorMode && state.view.colorMode !== 'neutral';
+    body.append(section('Oppsett',
+      h('div', { class: 'preset-grid' }, Object.entries(PRESETS).filter(([, p]) => p.show).map(([id, p], i) =>
+        h('button', { class: 'preset-thumb' + (state.preset === id ? ' on' : '') + (colorsOn ? ' colored' : ''), title: `${p.label} (${i + 1})`, onclick: () => applyPreset(id) },
+          thumb(p), h('span', {}, p.label)))),
+      seg([{ id: 'mono', label: 'Monokrom' }, { id: 'color', label: 'Farger' }], colorsOn ? 'color' : 'mono',
+        v => { state.view.colorMode = v === 'color' ? 'line' : 'neutral'; changed('view'); render(); })));
 
     // Holdeplass
     const results = h('div', { class: 'search-results' });
@@ -311,7 +337,7 @@ window.BV = window.BV || {};
 
   function keysList() {
     const dl = h('dl', { class: 'keys' });
-    [['S', 'Innstillinger'], ['E', 'Rediger layout (dra og skaler bokser)'], ['T', 'Trafikkmelding av/på'], ['G', 'Rutenett og prioritet'], ['F', 'Fullskjerm'], ['Esc', 'Lukk innstillinger']]
+    [['S', 'Innstillinger'], ['1–4', 'Oppsett 1–4'], ['E', 'Rediger layout (dra og skaler bokser)'], ['T', 'Trafikkmelding av/på'], ['G', 'Rutenett og prioritet'], ['F', 'Fullskjerm'], ['Esc', 'Lukk innstillinger']]
       .forEach(([k, v]) => dl.append(h('dt', {}, h('kbd', {}, k)), h('dd', {}, v)));
     return dl;
   }
@@ -329,11 +355,54 @@ window.BV = window.BV || {};
   }
 
   function applyPreset(id) {
+    const p = PRESETS[id];
+    if (!p) return;
     state.preset = id;
-    state.widgets = clone(PRESETS[id].widgets);
+    state.widgets = clone(p.widgets);
     normalizeWidgets(state);
-    changed('preset');
+    if (p.layout) {
+      state.manual = { [p.layout.map(q => q.id).sort().join(',')]: clone(p.layout) };
+      state.view.showStopName = false;
+    }
+    save(state);
+    onChange && onChange('view');
+    onChange && onChange('preset');
     if (open) render();
+  }
+
+  // Abstrakt miniatyr av et oppsett: bokser som flater, Neste buss lysest, klokken i hjørnet
+  function thumb(p) {
+    const W = 54, H = 96, pad = 3, g = 1.6;
+    const top = pad + 9;                       // under klokken
+    const cw = (W - 2 * pad - 11 * g) / 12, rh = (H - top - pad - 19 * g) / 20;
+    const clockW = 15;
+    let out = `<rect x="${W - pad - clockW}" y="${pad}" width="${clockW}" height="7" rx="2" class="th-clock"/>`;
+    p.layout.forEach(q => {
+      const x = pad + q.x * (cw + g), y = top + q.y * (rh + g);
+      const w = q.w * cw + (q.w - 1) * g, h = q.h * rh + (q.h - 1) * g;
+      const cls = q.id === 'hero' ? 'th-hero' : 'th-box';
+      if (q.y === 0) {
+        // Øverste boks strekker seg opp rundt klokken
+        const notchX = W - pad - clockW - g;
+        out += `<rect x="${x}" y="${pad}" width="${Math.max(0, Math.min(w, notchX - x))}" height="${h + top - pad}" rx="2.5" class="${cls}"/>`;
+      }
+      out += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2.5" class="${cls}"/>`;
+      if (q.id === 'line') out += `<line x1="${x + 3}" y1="${y + h / 2}" x2="${x + w - 3}" y2="${y + h / 2}" class="th-line"/>`;
+      if (q.id === 'clock') out += `<circle cx="${x + w / 2}" cy="${y + h / 2}" r="${Math.min(w, h) * 0.32}" class="th-dial"/>`;
+      if (q.id === 'departures' || q.id === 'routes') {
+        const n = Math.max(2, Math.min(5, Math.round(h / 4)));
+        for (let i = 0; i < n; i++) {
+          const ry = y + 2.5 + i * ((h - 5) / n), rhh = (h - 5) / n - 1.2;
+          out += `<rect x="${x + 2.5}" y="${ry}" width="${w - 5}" height="${rhh}" rx="1" class="th-row${i ? '' : ' first'}"/>`;
+          out += `<rect x="${x + 4}" y="${ry + rhh * 0.2}" width="${rhh * 0.6}" height="${rhh * 0.6}" rx=".8" class="th-chip c${i % 3}"/>`;
+        }
+      }
+      if (q.id === 'hero') out += `<rect x="${x + w / 2 - 4}" y="${y + h * 0.3}" width="8" height="${Math.min(14, h * 0.35)}" rx="1.5" class="th-num"/>`;
+    });
+    const el = document.createElement('span');
+    el.className = 'thumb';
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${out}</svg>`;
+    return el;
   }
 
   async function doSearch(q, results) {
