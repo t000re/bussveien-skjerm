@@ -2,7 +2,7 @@
    Passer på holdeplasser med få ruter (Auto: vises når det er 3 eller færre). */
 (function (BV) {
   const { el, upcoming, lineChip, setLineChip } = BV.util;
-  const ROW_PX = 112;
+  const ROW_PX = 84;   // minste radhøyde
 
   function groups(data, now) {
     const map = new Map();
@@ -32,8 +32,16 @@
       root.append(list);
       let capacity = 2, nTimes = 3;
 
+      let boxH = 0;
       function render(now) {
         const gs = groups(ctx.data, now).slice(0, capacity);
+        // Radhøyde ut fra antall rader som faktisk vises, så radene fyller boksen
+        if (boxH && gs.length) {
+          const gap = Math.max(12, Math.min(36, boxH * 0.06));
+          const rowH = (boxH - 32 - gap * (gs.length - 1)) / gs.length;
+          root.style.setProperty('--rgap', gap + 'px');
+          root.style.setProperty('--rowh', Math.min(rowH, 180) + 'px');
+        }
         BV.anim.keyedList(list, gs, g => g.key,
           () => {
             const row = el('div', 'route-row');
@@ -43,7 +51,8 @@
             row.append(pill, more);
             return row;
           },
-          (g, row, isNew) => {
+          (g, row, isNew, i) => {
+            row.classList.toggle('first', i === 0);
             const pill = row.children[0];
             setLineChip(pill.children[0], g.line, ctx);
             pill.children[1].textContent = g.dest;
@@ -57,11 +66,12 @@
       }
 
       const ro = new ResizeObserver(entries => {
-        const r = entries[entries.length - 1].contentRect;
-        const cap = Math.max(1, Math.floor((r.height - 20) / ROW_PX));
-        const nt = r.width > 800 ? 3 : 2;
-        root.classList.toggle('narrow', r.width <= 800);
-        if (cap === capacity && nt === nTimes) return;
+        // clientHeight/-Width tar med polstringen (contentRect gjør ikke det)
+        boxH = root.clientHeight;
+        const w = root.clientWidth;
+        const cap = Math.max(1, Math.floor((boxH - 32 + 14) / (ROW_PX + 14)));
+        const nt = w > 800 ? 3 : 2;
+        root.classList.toggle('narrow', w <= 800);
         capacity = cap; nTimes = nt;
         render(Date.now());
       });

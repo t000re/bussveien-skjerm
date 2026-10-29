@@ -38,7 +38,7 @@
 
       // Antall rader følger boksens faktiske høyde mens den animerer, så rader kommer og går mykt
       const ro = new ResizeObserver(entries => {
-        const h = entries[entries.length - 1].contentRect.height;
+        const h = root.clientHeight;   // med polstring
         const cap = Math.max(1, Math.floor((h - PAD_PX * 2) / ROW_PX));
         if (cap === capacity && root.style.getPropertyValue('--cap')) return;
         capacity = cap;

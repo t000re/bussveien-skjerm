@@ -3,8 +3,8 @@
 (function (BV) {
   const { svg, upcoming } = BV.util;
   const C = 100;            // senter i viewBox 200×200
-  const R_FACE = 76;
-  const R_MARK = 87;      // merkene ligger utenfor urskiven
+  const R_FACE = 92;
+  const R_MARK = 68;      // merkene ligger inne på urskiven, innenfor minuttstrekene
 
   function polar(angleDeg, r) {
     const a = (angleDeg - 90) * Math.PI / 180;
@@ -32,7 +32,7 @@
 
     create(root, ctx) {
       root.classList.add('w-clock');
-      const s = svg('svg', { viewBox: '-8 -8 216 216', class: 'clock-svg', preserveAspectRatio: 'xMidYMid meet' });
+      const s = svg('svg', { viewBox: '0 0 200 200', class: 'clock-svg', preserveAspectRatio: 'xMidYMid meet' });
       root.appendChild(s);
       svg('circle', { cx: C, cy: C, r: R_FACE, class: 'clock-face' }, s);
       const ticks = svg('g', { class: 'clock-ticks' }, s);
@@ -50,9 +50,9 @@
       }
       const arc = svg('path', { class: 'clock-arc', d: '' }, s);
       const marks = svg('g', { class: 'clock-marks' }, s);
-      const hourHand = svg('line', { x1: C, y1: C + 7, x2: C, y2: C - 36, class: 'hand hour' }, s);
-      const minHand = svg('line', { x1: C, y1: C + 8, x2: C, y2: C - 60, class: 'hand minute' }, s);
-      const secHand = svg('line', { x1: C, y1: C + 12, x2: C, y2: C - 66, class: 'hand second' }, s);
+      const hourHand = svg('line', { x1: C, y1: C + 8, x2: C, y2: C - 44, class: 'hand hour' }, s);
+      const minHand = svg('line', { x1: C, y1: C + 10, x2: C, y2: C - 74, class: 'hand minute' }, s);
+      const secHand = svg('line', { x1: C, y1: C + 14, x2: C, y2: C - 80, class: 'hand second' }, s);
       svg('circle', { cx: C, cy: C, r: 3.6, class: 'hand-hub' }, s);
       svg('circle', { cx: C, cy: C, r: 1.4, class: 'hand-hub-in' }, s);
 
@@ -74,10 +74,10 @@
 
       function render(now) {
         const deps = upcoming(ctx.data, now, false).filter(d => d.expected - now < 59 * 60000);
-        const next = deps[0];
+        const next = deps.find(d => d.expected > now);   // buen viser tiden fram til neste buss som ikke har gått
         const a0 = angleOf(now);
         if (next) {
-          arc.setAttribute('d', arcPath(a0, angleOf(next.expected), R_FACE - 1.5));
+          arc.setAttribute('d', arcPath(a0, angleOf(next.expected), R_FACE - 9));
           arc.style.opacity = 1;
         } else arc.style.opacity = 0;
 
@@ -89,7 +89,7 @@
           let r = R_MARK;
           for (const p of placed) {
             let da = Math.abs(p.ang - ang); if (da > 180) da = 360 - da;
-            if (da < 8 && Math.abs(p.r - r) < 10) r += 11;
+            if (da < 8 && Math.abs(p.r - r) < 10) r -= 12;
           }
           placed.push({ ang, r });
           keep.add(dep.key);
