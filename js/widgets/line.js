@@ -11,8 +11,10 @@
 (function (BV) {
   const { svg } = BV.util;
 
-  function opts(ctx) {
+  function opts(ctx, overview) {
     const v = ctx.settings.view;
+    // Oversikt: hele linjen, alle stopp (endeholdeplassene er da vanlige stopp)
+    if (overview) return { before: 99, after: 99, origin: false, terminus: false, overview: true };
     return {
       before: Math.max(1, Math.min(5, v.stopsBefore || 3)),
       after: Math.max(1, Math.min(5, v.stopsAfter || 3)),
@@ -124,13 +126,25 @@
     return { up, down, journeys, sig, patterns: ps, hereName: data.stop.name || 'Her', o };
   }
 
-  let cache = { at: null, key: '', model: null };
-  function model(data, ctx) {
+  const caches = {};
+  function model(data, ctx, overview) {
     if (!data) return null;
-    const o = opts(ctx);
+    const o = opts(ctx, overview);
     const key = JSON.stringify(o);
-    if (cache.at !== data || cache.key !== key) cache = { at: data, key, model: buildModel(data, o) };
-    return cache.model;
+    const c = caches[overview ? 'ov' : 'detail'];
+    if (c && c.at === data && c.key === key) return c.model;
+    const mdl = buildModel(data, o);
+    caches[overview ? 'ov' : 'detail'] = { at: data, key, model: mdl };
+    return mdl;
+  }
+
+  // Skal oversikten vises nå? «Veksle» bruker klokka, så alle skjermer bytter samtidig.
+  function wantOverview(ctx, now) {
+    const v = ctx.settings.view;
+    if (v.overview === 'on') return true;
+    if (v.overview !== 'cycle') return false;
+    const every = (v.overviewEvery || 2) * 60, dur = v.overviewFor || 15;
+    return ((now / 1000) % every) < dur;
   }
 
   /* ---------- Geometri (abstrakt: a langs, o på tvers) ---------- */
@@ -157,13 +171,40 @@
     return t.trimEnd() + '…';
   }
 
+  // Setter tekst som skal få plass i maxW: enten forkortes den («…») eller skriften krymper
+  // (ned til 10 px; er det fortsatt for trangt, forkortes den i tillegg).
+  function setFit(el, text, size, maxW, weight, mode) {
+    let fsz = size;
+    if (mode === 'shrink') {
+      const w = textWidth(text, size, weight);
+      if (w > maxW && maxW > 0) fsz = Math.max(10, size * maxW / w);
+    }
+    if (fsz !== size) el.setAttribute('font-size', fsz.toFixed(1));
+    el.textContent = fit(text, fsz, maxW, weight);
+  }
+
+  // Lange navn deles på to linjer ved et ordskille (mest mulig like lange linjer)
+  const WRAP_AT = 190;
+  function wrapName(text, size, weight) {
+    const one = textWidth(text, size, weight);
+    const words = text.split(/\s+/);
+    if (one <= WRAP_AT || words.length < 2) return { lines: [text], width: one };
+    let best = null;
+    for (let i = 1; i < words.length; i++) {
+      const a = words.slice(0, i).join(' '), b = words.slice(i).join(' ');
+      const w = Math.max(textWidth(a, size, weight), textWidth(b, size, weight));
+      if (!best || w < best.width) best = { lines: [a, b], width: w };
+    }
+    return best;
+  }
+
   BV.widgets.line = {
     title: 'Trasé',
     description: 'Stoppene før og etter, med gaffel der linjene deler seg',
     sizes: ['12x3', '12x2', '12x4', '4x20', '5x20', '6x20'],
     defaultSizes: ['12x3', '12x2', '12x4'],
 
-    available(data) { return { show: !!model(data, BV.app ? BV.app.ctx : { settings: { view: {} } }), must: false }; },
+    available(data) { return { show: !!model(data, BV.app ? BV.app.ctx : { settings: { view: {} } }, false), must: false }; },
 
     create(root, ctx) {
       root.classList.add('w-line');
@@ -177,7 +218,10 @@
         const W = size.w, H = size.h;
         if (W < 40 || H < 40) return;
         const vertical = H > W * 1.15;
-        const angled = !vertical && ctx.settings.view.labelAngle === 'angled';
+        const ov = !!m.o.overview;
+        // Oversikten bruker alltid skrå navn i liggende visning, så alle stoppene får plass
+        const angled = !vertical && (ov || ctx.settings.view.labelAngle === 'angled');
+        const fitMode = ctx.settings.view.labelFit === 'shrink' ? 'shrink' : 'truncate';
         const L = vertical ? H : W;          // lengde langs linjen
         const C = vertical ? W : H;          // bredde på tvers
         const map = (a, o) => vertical ? { x: o, y: a } : { x: a, y: o };
@@ -190,8 +234,17 @@
         };
 
         const compact = !vertical && H < 200;
-        const fs = compact ? 17 : 19;
-        const r = compact ? 8 : 10;
+        let fs = compact ? 17 : 19;
+        let r = compact ? 8 : 10;
+        let trackScale = 1;
+        if (ov) {
+          // Mindre skrift, prikker og spor jo flere stopp som skal få plass
+          const nAll = m.up.trunk.length + m.down.trunk.length + Math.max(0, ...m.up.branches.map(b => b.nodes.length)) + Math.max(0, ...m.down.branches.map(b => b.nodes.length));
+          const est = (L - 60) / Math.max(1, nAll);
+          fs = Math.max(10, Math.min(17, est * (vertical ? 0.55 : 0.7)));
+          r = Math.max(3.5, Math.min(7, est * 0.25));
+          trackScale = Math.max(0.45, Math.min(0.8, est / 60));
+        }
         const lanes = Math.max(m.up.lanes, m.down.lanes, 1);
         const forked = lanes > 1;
         // Grener med synlige stopp over hovedlinjen får navnene sine over
@@ -217,7 +270,7 @@
             above = topLabels ? (compact ? 20 : 24) + fs + 8 : (forked ? 26 : 62);
           }
           const minAbove = topLabels ? 40 : (forked ? 24 : 58), minBelow = angled ? 60 : below;
-          let dyPref = 54;
+          let dyPref = 58;
           let need = above + below + (lanes - 1) * dyPref;
           if (need > C && lanes > 1) { dyPref = Math.max(32, dyPref - (need - C) / (lanes - 1)); need = above + below + (lanes - 1) * dyPref; }
           if (need > C) {
@@ -244,27 +297,45 @@
         const sideInfo = sm => {
           const hasTerm = sm.terms.length > 0;
           const stub = !hasTerm && sm.ends.some(e => e.hidden);
-          const name = hasTerm && !vertical ? Math.min(260, Math.max(...sm.terms.map(t => textWidth(t.name, fs, 600)))) : 0;
-          return { hasTerm, stub, flex: hasTerm || stub, reserve: hasTerm ? (vertical ? 4 : r + 10 + name) : 0, n: visCount(sm) };
+          const name = hasTerm && !vertical ? Math.min(240, Math.max(...sm.terms.map(t => wrapName(t.name, fs, 600).width))) : 0;
+          return { hasTerm, stub, multi: sm.terms.length > 1, flex: hasTerm || stub, reserve: hasTerm ? (vertical ? 4 : r + 10 + name) : 0, n: visCount(sm) };
         };
         const sUp = sideInfo(m.up), sDown = sideInfo(m.down);
         const minGap = angled || vertical ? 56 : 40;
-        const [minSlot, maxSlot] = vertical ? [56, 190] : angled ? [56, 120] : [88, 180];
-        const gapMin = si => si.hasTerm ? minGap : si.stub ? 36 : 0;
+        const [minSlot, maxSlot] = ov ? [8, 120] : vertical ? [56, 190] : angled ? [56, 120] : [88, 180];
+        // Deler linjene seg mot flere endeholdeplasser, trenger gaffelen god plass for å synes
+        const gapMin = si => si.hasTerm ? (si.multi ? Math.max(minGap, Math.min(170, L * 0.16)) : minGap) : si.stub ? 36 : 0;
         const nTot = Math.max(1, sUp.n + sDown.n);
-        const usable = L - 2 * padEdge;
-        let fixed = sUp.reserve + sDown.reserve + gapMin(sUp) + gapMin(sDown);
+        // Skrå navn henger ned mot høyre: sørg for plass til navnet på det siste stoppet
+        let padR = padEdge;
+        if (angled && !sDown.hasTerm) {
+          const lastNames = [m.down.trunk[m.down.trunk.length - 1], ...m.down.branches.map(b => b.nodes[b.nodes.length - 1])].filter(Boolean).map(n => n.name);
+          const w = Math.max(0, ...lastNames.map(t => Math.min(280, textWidth(t, fs))));
+          padR = Math.max(padEdge, Math.min(220, w * Math.SQRT1_2 + 14));
+        }
+        const usable = L - padEdge - padR;
+        // Rekkefølge når plassen ikke strekker til: først krymper gaffelstrekket (ned til et
+        // minimum som fortsatt viser delingen), deretter kortes endeholdeplassnavnene ned.
+        const gap = { up: gapMin(sUp), down: gapMin(sDown) };
+        const floor = si => si.multi ? 90 : gapMin(si);
+        let fixed = sUp.reserve + sDown.reserve + gap.up + gap.down;
+        let short = fixed + minSlot * nTot - usable;
+        if (short > 0) {
+          const flexU = gap.up - floor(sUp), flexD = gap.down - floor(sDown);
+          const k = Math.min(1, short / Math.max(1, flexU + flexD));
+          gap.up -= flexU * k; gap.down -= flexD * k;
+          fixed = sUp.reserve + sDown.reserve + gap.up + gap.down;
+        }
         const slot = Math.max(minSlot, Math.min(maxSlot, (usable - fixed) / nTot));
-        // Ikke nok plass: endeholdeplassnavnene kortes ned
         const squeeze = Math.max(0, fixed + slot * nTot - usable);
         if (squeeze) {
           const tot = Math.max(1, sUp.reserve + sDown.reserve);
           [sUp, sDown].forEach(si => { if (si.reserve) si.reserve = Math.max(r + 60, si.reserve - squeeze * si.reserve / tot); });
-          fixed = sUp.reserve + sDown.reserve + gapMin(sUp) + gapMin(sDown);
+          fixed = sUp.reserve + sDown.reserve + gap.up + gap.down;
         }
         const extra = Math.max(0, usable - fixed - slot * nTot);
         const flexCount = (sUp.flex ? 1 : 0) + (sDown.flex ? 1 : 0);
-        const gapUp = gapMin(sUp) + (sUp.flex ? extra / flexCount : 0);
+        const gapUp = gap.up + (sUp.flex ? extra / flexCount : 0);
         const shift = flexCount ? 0 : extra / 2;   // ingen stiplede strekk: midtstill hele traseen
         const aC = padEdge + shift + sUp.reserve + gapUp + sUp.n * slot;
         const termA = dir => dir > 0 ? L - padEdge - sDown.reserve : padEdge + sUp.reserve;
@@ -274,15 +345,15 @@
         const strokeOf = code => BV.colors.stroke(code, (lineInfo.get(code) || {}).color, ctx);
         const allLines = m.patterns.map(p => p.lineCode);
 
-        const frag = svg('svg', { viewBox: `0 0 ${W} ${H}`, class: 'line-svg' + (vertical ? ' vertical' : '') });
+        const frag = svg('svg', { viewBox: `0 0 ${W} ${H}`, class: 'line-svg' + (vertical ? ' vertical' : '') + (ov ? ' ov' : '') });
         const tracks = svg('g', { class: 'tracks' }, frag);
         const dots = svg('g', { class: 'dots' }, frag);
         const labels = svg('g', { class: 'labels' }, frag);
 
         function track(p, q, lines, cls) {
           const codes = colored ? [...new Set(lines || [])].sort() : [];
-          if (!codes.length) { svg('path', { d: pathD(p, q), class: cls }, tracks); return; }
-          const n = codes.length, sw = n > 1 ? 6 : 10, gap = sw + 1.5;
+          if (!codes.length) { svg('path', { d: pathD(p, q), class: cls, style: trackScale !== 1 ? `stroke-width:${10 * trackScale}px` : '' }, tracks); return; }
+          const n = codes.length, sw = (n > 1 ? 6 : 10) * trackScale, gap = sw + 1.5;
           codes.forEach((code, i) => {
             const off = (i - (n - 1) / 2) * gap;
             svg('path', { d: pathD({ a: p.a, o: p.o + off }, { a: q.a, o: q.o + off }), class: cls, style: `stroke:${strokeOf(code)};stroke-width:${sw}px` }, tracks);
@@ -300,18 +371,23 @@
             const room = side > 0 ? C - p.o - 26 : p.o - 26;
             const anchor = side > 0 ? 'start' : 'end';
             const t = svg('text', { x: P.x + side * 22, y: o.sub ? P.y - 11 : P.y, class: cls, 'text-anchor': anchor, 'dominant-baseline': 'central', 'font-size': fs }, labels);
-            t.textContent = fit(text, fs, room, weight);
+            setFit(t, text, fs, room, weight, fitMode);
             if (o.sub) {
               const s2 = svg('text', { x: P.x + side * 22, y: P.y + 12, class: 'stop-label you-sub', 'text-anchor': anchor, 'dominant-baseline': 'central', 'font-size': fs - 3 }, labels);
               s2.textContent = o.sub;
             }
           } else if (angled) {
             const off = o.big ? 14 : 4;
-            const room = o.above ? (p.o - 14) / Math.SQRT1_2 - 6 : (C - p.o - 16) / Math.SQRT1_2 - 6;
-            const tf = o.above ? `translate(${P.x + off}, ${P.y - 14 - off}) rotate(-45)` : `translate(${P.x + off}, ${P.y + 14 + off}) rotate(45)`;
+            const room = Math.min(280, o.above ? (p.o - 14) / Math.SQRT1_2 - 6 : (C - p.o - 16) / Math.SQRT1_2 - 6);
+            // Ville navnet stikke ut på høyre side, speiles det og henger inn mot midten i stedet
+            const need = Math.min(room, textWidth(text, fs, weight)) * Math.SQRT1_2;
+            const mirror = !o.sub && P.x + off + need > W - 8;
+            const tf = mirror
+              ? (o.above ? `translate(${P.x - off}, ${P.y - 14 - off}) rotate(45)` : `translate(${P.x - off}, ${P.y + 14 + off}) rotate(-45)`)
+              : (o.above ? `translate(${P.x + off}, ${P.y - 14 - off}) rotate(-45)` : `translate(${P.x + off}, ${P.y + 14 + off}) rotate(45)`);
             const g = svg('g', { transform: tf }, labels);
-            const t = svg('text', { x: 0, y: 0, class: cls, 'text-anchor': 'start', 'dominant-baseline': 'central', 'font-size': fs }, g);
-            t.textContent = fit(text, fs, Math.min(room, 280), weight);
+            const t = svg('text', { x: 0, y: 0, class: cls, 'text-anchor': mirror ? 'end' : 'start', 'dominant-baseline': 'central', 'font-size': fs }, g);
+            setFit(t, text, fs, room, weight, fitMode);
             if (o.sub) {
               const s2 = svg('text', { x: 0, y: fs + 2, class: 'stop-label you-sub', 'text-anchor': 'start', 'dominant-baseline': 'central', 'font-size': fs - 3 }, g);
               s2.textContent = o.sub;
@@ -319,7 +395,7 @@
           } else {
             const y = o.above ? P.y - (compact ? 20 : 24) : P.y + (compact ? 30 : 38);
             const t = svg('text', { x: P.x, y, class: cls, 'text-anchor': 'middle', 'font-size': fs }, labels);
-            t.textContent = fit(text, fs, o.room || slot * 0.94, weight);
+            setFit(t, text, fs, o.room || slot * 0.94, weight, fitMode);
             if (o.sub) {
               const s2 = svg('text', { x: P.x, y: y + fs + 2, class: 'stop-label you-sub', 'text-anchor': 'middle', 'font-size': fs - 3 }, labels);
               s2.textContent = o.sub;
@@ -334,7 +410,16 @@
           const x = P.x + sideDir * (r + 10);
           if (vertical) room = C - x - 10;
           const t = svg('text', { x, y: P.y, class: 'stop-label term-label', 'text-anchor': sideDir > 0 ? 'start' : 'end', 'dominant-baseline': 'central', 'font-size': fs }, labels);
-          t.textContent = fit(tm.name, fs, room, 600);
+          const wr = wrapName(tm.name, fs, 600);
+          if (wr.lines.length === 1) { setFit(t, tm.name, fs, room, 600, fitMode); return; }
+          // To linjer, midtstilt rundt prikken; hver linje kortes ned hvis den fortsatt er for lang
+          // Begge linjene får samme skriftstørrelse
+          let lfs = fs;
+          if (fitMode === 'shrink') wr.lines.forEach(line => { const w = textWidth(line, fs, 600); if (w > room) lfs = Math.min(lfs, Math.max(10, fs * room / w)); });
+          wr.lines.forEach((line, i) => {
+            const ts = svg('tspan', { x, dy: i === 0 ? `${-0.6}em` : '1.2em', 'font-size': lfs.toFixed(1) }, t);
+            ts.textContent = fit(line, lfs, room, 600);
+          });
         }
 
         const nodePos = new Map();
@@ -383,7 +468,8 @@
             [...tm.bis].forEach(bi => {
               const from = endPos[bi];
               if (!from) return;
-              const forkLen = Math.min(Math.max(slot * 0.9, 50), Math.abs(a - from.p.a) * 0.45);
+              // Svingen strekkes over godt over halve strekket, så delingen leses som en gaffel
+              const forkLen = Math.max(50, Math.abs(a - from.p.a) * 0.6);
               const mid = { a: from.p.a + dir * forkLen, o };
               seg(dir, from.p, mid, [...tm.lines], cls);
               seg(dir, mid, p, [...tm.lines], cls);
@@ -406,16 +492,40 @@
         // Holdeplassen: navnet som de andre, «Du er her» under
         const HP = map(here.a, here.o);
         const youG = svg('g', { class: 'you', transform: `translate(${HP.x}, ${HP.y})` }, dots);
-        svg('circle', { r: 26, class: 'you-pulse' }, youG);
-        svg('circle', { r: compact ? 15 : 18, class: 'you-ring' }, youG);
-        svg('circle', { r: compact ? 10 : 12, class: 'you-dot' }, youG);
+        const yr = ov ? Math.max(9, r * 1.9) : compact ? 15 : 18;
+        svg('circle', { r: yr + 8, class: 'you-pulse' }, youG);
+        svg('circle', { r: yr, class: 'you-ring' }, youG);
+        svg('circle', { r: yr * 0.67, class: 'you-dot' }, youG);
         label(here, m.hereName, { cls: 'here-label', weight: 650, sub: 'Du er her', room: slot * 1.1, big: true });
 
         busLayer = svg('g', { class: 'buses' }, frag);
         busEls.clear();
         // Med gaffel legger bussmerkene seg på linjen (ingen «stilk»), så de ikke kolliderer med sporene over
-        G = { vertical, pill: vertical || forked, map, nodePos, gapPath, here };
+        const prevG = G, prevSvg = root.querySelector('svg.line-svg:not(.leaving)');
+        G = { vertical, pill: vertical || forked, map, nodePos, gapPath, here, slot };
 
+        if (animate === 'zoom' && prevSvg && prevG && prevG.vertical === vertical) {
+          // Zoom mellom detalj og oversikt: begge visningene skaleres rundt «Du er her»,
+          // slik at holdeplassen står stille mens resten av linjen kommer inn eller glir ut.
+          const oh = prevG.map(prevG.here.a, prevG.here.o), nh = map(here.a, here.o);
+          const k = Math.max(0.12, Math.min(8, prevG.slot / slot));
+          const dur = BV.anim.ms(1400);
+          root.querySelectorAll('svg.line-svg.leaving').forEach(e => e.remove());
+          prevSvg.classList.add('leaving');
+          prevSvg.style.transformOrigin = `${oh.x}px ${oh.y}px`;
+          prevSvg.animate([
+            { transform: 'none', opacity: 1 },
+            { transform: `translate(${nh.x - oh.x}px, ${nh.y - oh.y}px) scale(${1 / k})`, opacity: 0 }
+          ], { duration: dur, easing: BV.anim.ease, fill: 'forwards' }).onfinish = () => prevSvg.remove();
+          root.appendChild(frag);
+          frag.style.transformOrigin = `${nh.x}px ${nh.y}px`;
+          frag.animate([
+            { transform: `translate(${oh.x - nh.x}px, ${oh.y - nh.y}px) scale(${k})`, opacity: 0 },
+            { opacity: 1, offset: 0.45 },
+            { transform: 'none', opacity: 1 }
+          ], { duration: dur, easing: BV.anim.ease });
+          return;
+        }
         root.innerHTML = '';
         root.appendChild(frag);
         if (animate) frag.animate([{ opacity: 0 }, { opacity: 1 }], { duration: BV.anim.ms(600), easing: BV.anim.ease });
@@ -425,7 +535,7 @@
       function journeyTrack(j, k, o) {
         const pts = [];
         const calls = j.calls;
-        const ahead = Math.max(1, Math.min(o.before, ctx.settings.view.busStops || 2));
+        const ahead = o.overview ? o.before : Math.max(1, Math.min(o.before, ctx.settings.view.busStops || 2));
         for (let i = Math.max(0, k - ahead); i < k; i++) {
           const p = G.nodePos.get('up|' + calls[i].stopId);
           if (p) pts.push({ a: p.a, o: p.o, time: calls[i].time, appear: !pts.length });
@@ -481,8 +591,9 @@
         return g;
       }
 
+      let ovOn = false;
       function renderBuses(now) {
-        const m = model(ctx.data, ctx);
+        const m = model(ctx.data, ctx, ovOn);
         if (!m || !busLayer || !G) return;
         const nextKey = (BV.util.upcoming(ctx.data, now, false)[0] || {}).journeyId;
         const keep = new Set();
@@ -524,13 +635,17 @@
       ro.observe(root);
 
       function render(now, fromResize) {
-        const m = model(ctx.data, ctx);
+        const ov = wantOverview(ctx, now);
+        const m = model(ctx.data, ctx, ov) || (ov ? model(ctx.data, ctx, false) : null);
         if (!m) return;
-        const sig = m.sig + '§' + size.w + 'x' + size.h + '§' + ctx.settings.view.labelAngle;
+        const switched = ov !== ovOn;
+        ovOn = !!m.o.overview;
+        const sig = m.sig + '§' + size.w + 'x' + size.h + '§' + ctx.settings.view.labelAngle + '§' + ctx.settings.view.labelFit;
         if (sig !== builtSig) {
+          const hadBuild = !!builtSig;
           const modelChanged = !builtSig || builtSig.split('§')[0] !== m.sig;
           builtSig = sig;
-          build(m, modelChanged && !fromResize);
+          build(m, switched && hadBuild ? 'zoom' : (modelChanged && !fromResize));
         }
         renderBuses(now);
       }

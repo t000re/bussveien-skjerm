@@ -224,6 +224,10 @@ body.show-grid .box { box-shadow: inset 0 0 0 2px rgba(47, 124, 246, .55); }
   box-shadow: 12px 0 22px -4px rgba(0, 0, 0, .45);
 }
 .route-next + .route-next { z-index: 1; background: color-mix(in srgb, var(--card-2) 45%, var(--card)); box-shadow: none; }
+/* Rader under den første: et hakk mørkere, så neste avgang og raden under får hvert sitt fokus */
+.route-row:not(.first) .route-pill { background: color-mix(in srgb, var(--card-3) 55%, var(--card)); }
+.route-row:not(.first) .route-next { background: color-mix(in srgb, var(--card-2) 60%, var(--card)); }
+.route-row:not(.first) .route-next + .route-next { background: color-mix(in srgb, var(--card-2) 25%, var(--card)); }
 .route-pill .line-chip { font-size: 1em; min-width: 1.6em; height: 1.6em; border-radius: .32em; background: color-mix(in srgb, var(--card-3), #fff 12%); }
 .route-dest { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
 .route-time { display: inline-grid; justify-items: center; line-height: .95; font-variant-numeric: tabular-nums; min-width: 2.1em; }
@@ -298,10 +302,10 @@ body.show-grid .box { box-shadow: inset 0 0 0 2px rgba(47, 124, 246, .55); }
 
 /* ---------- Trasé ---------- */
 .w-line { display: grid; }
-.line-svg { width: 100%; height: 100%; overflow: visible; }
+.line-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .track { fill: none; stroke: var(--line-track); stroke-width: 10; stroke-linecap: round; }
 .track.tail { stroke-linecap: butt; }
-.stop-dot { fill: var(--green-strong); stroke: var(--card); stroke-width: 4; }
+.stop-dot { fill: #d9d9d9; stroke: var(--card); stroke-width: 4; }
 .stop-label { fill: var(--muted); font-weight: 500; font-family: inherit; }
 .you-label { fill: #e8e8e8; font-weight: 600; }
 .you-ring { fill: #fff; }
@@ -528,7 +532,7 @@ body.editing #stage { border-radius: 36px; box-shadow: 0 0 0 2px #1f1f1f; }
 .here-label { fill: #f2f2f2; }
 .you-sub { fill: #6fa5ff; font-weight: 600; paint-order: stroke; stroke: var(--card); stroke-width: 6px; }
 .term-label { fill: #d6d6d6; }
-.term-dot { fill: var(--card); stroke: var(--green-strong); stroke-width: 4; }
+.term-dot { fill: var(--card); stroke: #d9d9d9; stroke-width: 4; }
 .track.gap { stroke-dasharray: 0.1 16; stroke-linecap: round; }
 .bus-arrow { fill: #cfcfcf; transition: fill var(--dur-med); }
 .bus.next .bus-arrow { fill: var(--green); }
@@ -540,3 +544,8 @@ body.editing #stage { border-radius: 36px; box-shadow: 0 0 0 2px #1f1f1f; }
 .topbar-stop, .topbar-time { pointer-events: auto; transition: opacity var(--dur-layout) var(--ease-soft), transform var(--dur-layout) var(--ease-spring), box-shadow var(--dur-layout) var(--ease-soft); }
 body.no-stopname .topbar-stop { opacity: 0; transform: translateY(-24px); pointer-events: none; }
 
+
+/* Oversikt over hele linjen */
+.line-svg.ov .stop-dot, .line-svg.ov .term-dot { stroke-width: 2; }
+.line-svg.ov .bus-inner { transform: scale(.72); }
+.line-svg.ov .stop-label { stroke-width: 4px; }
