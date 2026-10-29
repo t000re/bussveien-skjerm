@@ -18,6 +18,8 @@
     if (overview) return { before: 99, after: 99, origin: false, terminus: false, overview: true, simplify };
     return {
       simplify,
+      // Endeholdeplasser vises for de N rutene med flest avganger; resten blir stiplet linje videre
+      maxTerm: v.maxTermini === 'all' ? 99 : Math.max(1, Math.min(6, v.maxTermini || 3)),
       before: Math.max(1, Math.min(5, v.stopsBefore || 3)),
       after: Math.max(1, Math.min(5, v.stopsAfter || 3)),
       origin: v.showOrigin !== false,
@@ -118,29 +120,30 @@
           if (!termMap.has(key)) termMap.set(key, { ...t, lines: new Set(), bis: new Set() });
           const tm = termMap.get(key);
           tm.lines.add(p.lineCode); tm.bis.add(e.bi); tm.gap = tm.gap || t.gap;
+          tm.weight = (tm.weight || 0) + w(p.key);
         });
         return end;
       });
-      // Spor: hver gren får sitt eget; endeholdeplassen fortsetter helst rett fram på en gren den hører til
+      // Bare de mest brukte endeholdeplassene (flest avganger den neste timen)
+      const limit = o.maxTerm || 99;
+      const terms = [...termMap.values()].sort((a, b) => b.weight - a.weight).slice(0, limit);
+      // Spor fordeles gren for gren nedenfra: hver gren får sine endeholdeplasser rett over
+      // seg før neste gren begynner, så ingen linjer krysser. Felles endeholdeplasser
+      // legges øverst i blokken, der neste gren kan fortsette rett inn i dem.
       const branchLane = {};
-      list.forEach((e, i) => { branchLane[e.bi] = i; });
-      let maxLane = list.length - 1;
-      const taken = new Set();
-      const terms = [...termMap.values()].sort((a, b) => a.bis.size - b.bis.size || b.lines.size - a.lines.size);
-      terms.forEach(tm => {
-        const cands = [...tm.bis].map(bi => branchLane[bi]).sort((a, b) => b - a);
-        const free = cands.find(l => !taken.has(l));
-        tm.lane = free !== undefined ? free : ++maxLane;
-        taken.add(tm.lane);
+      let lane = 0;
+      list.forEach(e => {
+        const mine = terms.filter(tm => tm.bis.has(e.bi));
+        const prev = mine.filter(tm => tm.lane !== undefined);
+        const fresh = mine.filter(tm => tm.lane === undefined)
+          .sort((a, b) => a.bis.size - b.bis.size || b.lines.size - a.lines.size);
+        if (prev.length) branchLane[e.bi] = Math.min(...prev.map(tm => tm.lane));
+        else branchLane[e.bi] = fresh.length ? lane : lane++;
+        fresh.forEach(tm => { tm.lane = lane++; });
       });
+      const maxLane = Math.max(0, lane - 1, ...Object.values(branchLane));
       sm.terms = terms.sort((a, b) => a.lane - b.lane);
       sm.lanes = maxLane + 1;
-      // Forenkling: mange endeholdeplasser blir bare en stiplet linje som fortsetter
-      if (o.simplify && sm.terms.length > 2) {
-        sm.terms = [];
-        sm.ends.forEach(e => { e.hidden = true; });
-        sm.lanes = list.length;
-      }
       sm.branchLane = bi => branchLane[bi] || 0;
       return sm;
     }
