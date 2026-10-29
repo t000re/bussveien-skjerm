@@ -588,3 +588,5 @@ body.no-stopname .topbar-stop { opacity: 0; transform: translateY(-24px); pointe
 .w-clock.simple .mark-text { font-weight: 700; }
 .w-clock.simple .mark-bg { fill: #3d3d3d; }
 .w-clock.simple .mark.next .mark-bg { fill: var(--green); }
+.hand.second.braun { stroke: #f6b21a; stroke-width: 0.9; }
+.hand-hub-in.braun { fill: #f6b21a; }

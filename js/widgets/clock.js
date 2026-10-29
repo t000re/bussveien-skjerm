@@ -46,7 +46,7 @@
         root.classList.toggle('simple', simple);
         // Merkestørrelse og antall per variant
         cfg = simple
-          ? { max: 3, h: 26, font: 15, r: 64, step: 28, hourLen: 34, minLen: 56 }
+          ? { max: 3, h: 21, font: 11.5, r: 66, step: 23, hourLen: 34, minLen: 56 }
           : { max: 99, h: 11, font: 6.6, r: R_MARK, step: 12, hourLen: 44, minLen: 74 };
         s.innerHTML = '';
         markEls.clear();
@@ -75,9 +75,12 @@
         arc = svg('path', { class: 'clock-arc', d: '' }, s);
         hourHand = svg('line', { x1: C, y1: C + 8, x2: C, y2: C - cfg.hourLen, class: 'hand hour' }, s);
         minHand = svg('line', { x1: C, y1: C + 10, x2: C, y2: C - cfg.minLen, class: 'hand minute' }, s);
-        secHand = simple ? null : svg('line', { x1: C, y1: C + 14, x2: C, y2: C - 80, class: 'hand second' }, s);
+        // Enkel: syltynn guloransje sekundviser med motvekt, i Braun-stil
+        secHand = simple
+          ? svg('line', { x1: C, y1: C + 18, x2: C, y2: C - 82, class: 'hand second braun' }, s)
+          : svg('line', { x1: C, y1: C + 14, x2: C, y2: C - 80, class: 'hand second' }, s);
         svg('circle', { cx: C, cy: C, r: 3.6, class: 'hand-hub' }, s);
-        if (!simple) svg('circle', { cx: C, cy: C, r: 1.4, class: 'hand-hub-in' }, s);
+        svg('circle', { cx: C, cy: C, r: simple ? 2 : 1.4, class: 'hand-hub-in' + (simple ? ' braun' : '') }, s);
         marks = svg('g', { class: 'clock-marks' }, s);   // merkene over viserne, så de alltid kan leses
       }
 
@@ -130,7 +133,7 @@
             const mw = len > 1 ? H * 0.55 + len * fsz * 0.62 : H;
             const st = BV.colors.chip(dep.line, ctx);
             if (st) g.classList.add('colored');
-            svg('rect', { x: -mw / 2, y: -H / 2, width: mw, height: H, rx: mode === 'simple' ? H * 0.3 : H / 2, class: 'mark-bg', style: st ? `fill:${st.bg}` : '' }, inner);
+            svg('rect', { x: -mw / 2, y: -H / 2, width: mw, height: H, rx: H / 2, class: 'mark-bg', style: st ? `fill:${st.bg}` : '' }, inner);
             const t = svg('text', { class: 'mark-text', 'text-anchor': 'middle', 'dominant-baseline': 'central', y: 0.4, style: `font-size:${fsz}px;` + (st ? `fill:${st.fg}` : '') }, inner);
             t.textContent = dep.line.code;
             markEls.set(dep.key, g);
