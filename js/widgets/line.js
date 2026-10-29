@@ -14,8 +14,10 @@
   function opts(ctx, overview) {
     const v = ctx.settings.view;
     // Oversikt: hele linjen, alle stopp (endeholdeplassene er da vanlige stopp)
-    if (overview) return { before: 99, after: 99, origin: false, terminus: false, overview: true };
+    const simplify = v.simplify !== false;
+    if (overview) return { before: 99, after: 99, origin: false, terminus: false, overview: true, simplify };
     return {
+      simplify,
       before: Math.max(1, Math.min(5, v.stopsBefore || 3)),
       after: Math.max(1, Math.min(5, v.stopsAfter || 3)),
       origin: v.showOrigin !== false,
@@ -81,10 +83,28 @@
     });
     if (!patterns.size) return null;
     const ps = Array.from(patterns.values());
+    // Vekt: antall avganger den neste timen per linje/destinasjon (minst 1)
+    const now = Date.now();
+    const weight = new Map();
+    (data.departures || []).forEach(d => {
+      if (d.expected - now > 60 * 60000) return;
+      const k = d.line.code + '|' + d.dest;
+      weight.set(k, (weight.get(k) || 0) + 1);
+    });
+    const w = k => Math.max(1, weight.get(k) || 0);
     const byKey = new Map(ps.map(p => [p.key, p]));
 
     function side(prop, hiddenProp, nodesProp, depth) {
-      const sm = buildSide(ps.map(p => ({ key: p.key, lineCode: p.lineCode, nodes: p[nodesProp] })), depth);
+      const seqs = keys => ps.filter(p => keys.includes(p.key)).map(p => ({ key: p.key, lineCode: p.lineCode, nodes: p[nodesProp] }));
+      let sm = buildSide(seqs(ps.map(p => p.key)), depth);
+      // Forenkling: vis bare hovedtraseen og grener med minst en fjerdedel av avgangene
+      if (o.simplify && sm.branches.length > 1) {
+        const bw = sm.branches.map(b => b.keys.reduce((a, k) => a + w(k), 0));
+        const total = bw.reduce((a, b) => a + b, 0);
+        const order = sm.branches.map((b, i) => i).sort((a, b) => bw[b] - bw[a]);
+        const keep = order.filter((i, rank) => rank === 0 || (rank < 2 && bw[i] >= total * 0.25));
+        if (keep.length < sm.branches.length) sm = buildSide(seqs(keep.flatMap(i => sm.branches[i].keys)), depth);
+      }
       const list = sm.branches.length ? sm.branches.map((b, bi) => ({ bi, keys: b.keys })) : [{ bi: 0, keys: sm.trunkKeys }];
       // Én node per endeholdeplass, selv om flere grener ender der (slås sammen på navn)
       const termMap = new Map();
@@ -115,6 +135,12 @@
       });
       sm.terms = terms.sort((a, b) => a.lane - b.lane);
       sm.lanes = maxLane + 1;
+      // Forenkling: mange endeholdeplasser blir bare en stiplet linje som fortsetter
+      if (o.simplify && sm.terms.length > 2) {
+        sm.terms = [];
+        sm.ends.forEach(e => { e.hidden = true; });
+        sm.lanes = list.length;
+      }
       sm.branchLane = bi => branchLane[bi] || 0;
       return sm;
     }
@@ -351,7 +377,8 @@
         const labels = svg('g', { class: 'labels' }, frag);
 
         function track(p, q, lines, cls) {
-          const codes = colored ? [...new Set(lines || [])].sort() : [];
+          let codes = colored ? [...new Set(lines || [])].sort() : [];
+          if (m.o.simplify && codes.length > 3) codes = [];   // mer enn tre linjer: ett nøytralt spor
           if (!codes.length) { svg('path', { d: pathD(p, q), class: cls, style: trackScale !== 1 ? `stroke-width:${10 * trackScale}px` : '' }, tracks); return; }
           const n = codes.length, sw = (n > 1 ? 6 : 10) * trackScale, gap = sw + 1.5;
           codes.forEach((code, i) => {

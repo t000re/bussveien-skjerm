@@ -250,6 +250,7 @@ window.BV = window.BV || {};
       h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Stoppnavn'),
         seg([{ id: 'flat', label: 'Rett' }, { id: 'angled', label: 'Skrå 45°' }],
           state.view.labelAngle, v => { state.view.labelAngle = v; changed('view'); render(); })),
+      toggle(state.view.simplify !== false, v => { state.view.simplify = v; changed('view'); }, 'Forenkle ved mange linjer'),
       h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Lange navn'),
         seg([{ id: 'truncate', label: 'Forkort' }, { id: 'shrink', label: 'Mindre skrift' }],
           state.view.labelFit || 'truncate', v => { state.view.labelFit = v; changed('view'); render(); })),
