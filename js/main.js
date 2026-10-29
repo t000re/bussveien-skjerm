@@ -130,6 +130,17 @@
     BV.editor && BV.editor.refresh();
   }
 
+  // Hvor en boks kommer inn fra og går ut til: nærmeste skjermkant. Bokser som går
+  // over hele bredden bruker alltid bunnen; ellers sideveis når siden er nærmest.
+  function offstage(g) {
+    const left = g.x, right = STAGE_W - (g.x + g.w), bottom = STAGE_H - (g.y + g.h);
+    const full = left < PAD * 2 && right < PAD * 2;
+    if (!full && right <= left && right < bottom) return [STAGE_W - g.x + 40, 0];
+    if (!full && left < right && left < bottom) return [-(g.x + g.w + 40), 0];
+    return [0, STAGE_H - g.y + 40];
+  }
+  const tr = (v, f = 1) => Math.round(v[0] * f) + 'px ' + Math.round(v[1] * f) + 'px';
+
   function apply(placed, now, first) {
     const ids = new Set(placed.map(p => p.id));
     const dur = BV.anim.ms(BV.anim.LAYOUT_MS);
@@ -139,12 +150,12 @@
       if (ids.has(id)) return;
       boxes.delete(id);
       b.el.classList.add('leaving');
-      // Glir ut nedover, under de andre boksene, mens de vokser inn i plassen
-      const drop = STAGE_H - (b.geo ? b.geo.y : 0) + 40;
+      // Glir ut mot nærmeste kant, under de andre boksene, mens de vokser inn i plassen
+      const off = offstage(b.geo || { x: 0, y: 0, w: STAGE_W, h: 0 });
       const a = b.el.animate([
         { translate: '0 0', opacity: 1 },
-        { translate: '0 ' + Math.round(drop * 0.7) + 'px', opacity: 1, offset: 0.7 },
-        { translate: '0 ' + drop + 'px', opacity: 0 }
+        { translate: tr(off, 0.7), opacity: 1, offset: 0.7 },
+        { translate: tr(off), opacity: 0 }
       ], { duration: dur, easing: 'cubic-bezier(.5,0,.25,1)', fill: 'forwards' });
       a.onfinish = () => { b.inst.destroy && b.inst.destroy(); b.el.remove(); };
     });
@@ -174,12 +185,11 @@
         el.getBoundingClientRect();
         el.style.transition = '';
         if (!first) {
-          // Glir inn nedenfra, bak de andre boksene, samtidig som de krymper og gir plass.
-          // Samme fjær og varighet som resten av layouten, så alt beveger seg som én masse.
-          const rise = STAGE_H - geo.y + 40;
+          // Glir inn fra nærmeste kant (siden den havner på), bak de andre boksene, samtidig
+          // som de krymper og gir plass. Samme fjær og varighet som resten av layouten.
           el.style.zIndex = '0';
           const a = el.animate([
-            { translate: '0 ' + rise + 'px', opacity: 0 },
+            { translate: tr(offstage(geo)), opacity: 0 },
             { opacity: 1, offset: 0.25 },
             { translate: '0 0', opacity: 1 }
           ], { duration: dur, easing: BV.anim.spring, fill: 'backwards' });
