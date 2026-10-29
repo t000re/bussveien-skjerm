@@ -118,7 +118,7 @@ window.BV = window.BV || {};
       if (!w.sizes || !w.sizes.length) w.sizes = (def.defaultSizes || def.sizes).slice();
       w.sizes = w.sizes.filter(x => def.sizes.includes(x));
       if (!w.sizes.length) w.sizes = def.sizes.slice();
-      if (def.modes && !w.mode) w.mode = def.modes[0].id;
+      if (def.modes && !def.modes.some(m => m.id === w.mode)) w.mode = def.modes[0].id;
     });
   }
 

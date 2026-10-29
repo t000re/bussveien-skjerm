@@ -1,12 +1,20 @@
-/* Analog klokke med to varianter:
-   Avansert – alle avgangene den neste timen som små linjemerker, minuttstreker og sekundviser.
-   Enkel    – bare time- og minuttviser og de tre neste bussene som store, lesbare linjeskilt.
-   I begge viser en grønn bue tiden fram til neste buss. */
+/* Klokke i Braun-stil: grå time- og minuttviser, tynn guloransje sekundviser og
+   prikker på 12, 3, 6 og 9. Avgangene står som runde linjeskilt ytterst på urskiven,
+   ved nøyaktig minutt. Viserne slutter før skiltene, så de aldri dekker en buss.
+   Tette avganger overlapper: nærmeste øverst, de neste glir inn under.
+
+   Valg for hvor mye som vises:
+     next5 – de fem neste avgangene (samme som lista)
+     hour  – alle avgangene den neste timen
+     dots  – de fem neste som skilt, resten av timen som små grå prikker */
 (function (BV) {
   const { svg, upcoming } = BV.util;
-  const C = 100;            // senter i viewBox 200×200
+  const C = 100;             // senter i viewBox 200×200
   const R_FACE = 92;
-  const R_MARK = 68;      // merkene ligger inne på urskiven, innenfor minuttstrekene
+  const R_CHIP = 78;         // skiltenes ring
+  const EDGE = R_FACE - 4;   // skiltenes ytterkant skal ligge innenfor denne
+  const H = 20, FONT = 11.5; // skiltstørrelse
+  const SHOWN = 5;
 
   function polar(angleDeg, r) {
     const a = (angleDeg - 90) * Math.PI / 180;
@@ -16,188 +24,128 @@
     const d = new Date(ms);
     return (d.getMinutes() + d.getSeconds() / 60 + d.getMilliseconds() / 60000) * 6;
   }
-  function arcPath(a0, a1, r) {
-    let sweep = a1 - a0;
-    while (sweep < 0) sweep += 360;
-    if (sweep < 0.5) sweep = 0.5;
-    const [x0, y0] = polar(a0, r);
-    const [x1, y1] = polar(a0 + sweep, r);
-    return `M ${x0} ${y0} A ${r} ${r} 0 ${sweep > 180 ? 1 : 0} 1 ${x1} ${y1}`;
-  }
 
   BV.widgets.clock = {
     title: 'Klokke',
-    description: 'Urskive med avgangene den neste timen',
+    description: 'Urskive med de neste avgangene',
     sizes: ['6x5', '6x8', '6x4', '4x4'],
-    modes: [{ id: 'advanced', label: 'Avansert' }, { id: 'simple', label: 'Enkel' }],
+    modes: [{ id: 'next5', label: 'Neste 5' }, { id: 'hour', label: 'Hele timen' }, { id: 'dots', label: '5 + prikker' }],
 
     available() { return { show: true, must: false }; },
 
     create(root, ctx) {
-      root.classList.add('w-clock');
+      root.classList.add('w-clock', 'simple');
       const s = svg('svg', { viewBox: '0 0 200 200', class: 'clock-svg', preserveAspectRatio: 'xMidYMid meet' });
       root.appendChild(s);
-      const modeOf = () => ((ctx.settings.widgets.find(w => w.id === 'clock') || {}).mode) || 'advanced';
-      let mode, arc, marks, hourHand, minHand, secHand, cfg;
-
-      function build() {
-        mode = modeOf();
-        const simple = mode === 'simple';
-        root.classList.toggle('simple', simple);
-        // Merkestørrelse og antall per variant
-        cfg = simple
-          ? { max: 4, h: 20, font: 11.5, r: 78, edge: R_FACE - 4, step: 0, hourLen: 36, minLen: 56 }
-          : { max: 99, h: 11, font: 6.6, r: R_MARK, step: 12, hourLen: 44, minLen: 74 };
-        s.innerHTML = '';
-        markEls.clear();
-        svg('circle', { cx: C, cy: C, r: R_FACE, class: 'clock-face' }, s);
-        const ticks = svg('g', { class: 'clock-ticks' }, s);
-        if (simple) {
-          // Bare fire prikker for kvartene
-          for (let i = 0; i < 4; i++) {
-            const [x, y] = polar(i * 90, 78);
-            svg('circle', { cx: x, cy: y, r: 2.6, class: 'tick-dot' }, ticks);
-          }
-        } else {
-          for (let i = 0; i < 60; i++) {
-            const major = i % 15 === 0, hour = i % 5 === 0;
-            if (!hour) {
-              const [x0, y0] = polar(i * 6, R_FACE - 6);
-              const [x1, y1] = polar(i * 6, R_FACE - 4);
-              svg('line', { x1: x0, y1: y0, x2: x1, y2: y1, class: 'tick minor' }, ticks);
-              continue;
-            }
-            const [x0, y0] = polar(i * 6, R_FACE - (major ? 13 : 9.5));
-            const [x1, y1] = polar(i * 6, R_FACE - 5);
-            svg('line', { x1: x0, y1: y0, x2: x1, y2: y1, class: 'tick' + (major ? ' major' : '') }, ticks);
-          }
-        }
-        // Enkel: svak ring der minuttviserens spiss og linjeskiltene møtes
-        arc = svg('path', { class: 'clock-arc', d: '' }, s);
-        if (simple) arc.style.display = 'none';   // enkel: det grønne skiltet viser neste buss
-        hourHand = svg('line', { x1: C, y1: C + 8, x2: C, y2: C - cfg.hourLen, class: 'hand hour' }, s);
-        minHand = svg('line', { x1: C, y1: C + 10, x2: C, y2: C - cfg.minLen, class: 'hand minute' }, s);
-        // Enkel: syltynn guloransje sekundviser med motvekt, i Braun-stil
-        secHand = simple
-          ? svg('line', { x1: C, y1: C + 16, x2: C, y2: C - 56, class: 'hand second braun' }, s)
-          : svg('line', { x1: C, y1: C + 14, x2: C, y2: C - 80, class: 'hand second' }, s);
-        svg('circle', { cx: C, cy: C, r: 3.6, class: 'hand-hub' }, s);
-        svg('circle', { cx: C, cy: C, r: simple ? 2 : 1.4, class: 'hand-hub-in' + (simple ? ' braun' : '') }, s);
-        marks = svg('g', { class: 'clock-marks' }, s);   // merkene over viserne, så de alltid kan leses
+      svg('circle', { cx: C, cy: C, r: R_FACE, class: 'clock-face' }, s);
+      for (let i = 0; i < 4; i++) {
+        const [x, y] = polar(i * 90, R_CHIP);
+        svg('circle', { cx: x, cy: y, r: 2.6, class: 'tick-dot' }, s);
       }
+      const dotLayer = svg('g', { class: 'clock-dots' }, s);
+      const hourHand = svg('line', { x1: C, y1: C + 8, x2: C, y2: C - 36, class: 'hand hour' }, s);
+      const minHand = svg('line', { x1: C, y1: C + 10, x2: C, y2: C - 56, class: 'hand minute' }, s);
+      const secHand = svg('line', { x1: C, y1: C + 16, x2: C, y2: C - 56, class: 'hand second braun' }, s);
+      svg('circle', { cx: C, cy: C, r: 3.6, class: 'hand-hub' }, s);
+      svg('circle', { cx: C, cy: C, r: 2, class: 'hand-hub-in braun' }, s);
+      const marks = svg('g', { class: 'clock-marks' }, s);   // over viserne, så skiltene alltid kan leses
 
       const markEls = new Map();
-      let raf;
-      build();
+      const dotEls = new Map();
+      const modeOf = () => {
+        const m = (ctx.settings.widgets.find(w => w.id === 'clock') || {}).mode;
+        return ['next5', 'hour', 'dots'].includes(m) ? m : 'next5';
+      };
 
+      let raf;
       function frame() {
-        const now = Date.now();
-        const d = new Date(now);
+        const d = new Date();
         const sec = d.getSeconds() + d.getMilliseconds() / 1000;
         const min = d.getMinutes() + sec / 60;
         const hr = (d.getHours() % 12) + min / 60;
-        if (secHand) secHand.setAttribute('transform', `rotate(${sec * 6} ${C} ${C})`);
+        secHand.setAttribute('transform', `rotate(${sec * 6} ${C} ${C})`);
         minHand.setAttribute('transform', `rotate(${min * 6} ${C} ${C})`);
         hourHand.setAttribute('transform', `rotate(${hr * 30} ${C} ${C})`);
         raf = requestAnimationFrame(frame);
       }
       raf = requestAnimationFrame(frame);
 
-      function render(now) {
-        if (modeOf() !== mode) build();
-        const deps = upcoming(ctx.data, now, false).filter(d => d.expected - now < 59 * 60000).slice(0, cfg.max);
-        const next = deps.find(d => d.expected > now);   // buen viser tiden fram til neste buss som ikke har gått
-        const a0 = angleOf(now);
-        if (next) {
-          arc.setAttribute('d', arcPath(a0, angleOf(next.expected), R_FACE - 9));
-          arc.style.opacity = 1;
-        } else arc.style.opacity = 0;
+      function makeChip(dep) {
+        const g = svg('g', { class: 'mark' }, marks);
+        const inner = svg('g', { class: 'mark-inner' }, g);
+        const len = String(dep.line.code).length;
+        const fsz = len > 2 ? FONT * 0.82 : FONT;
+        const w = len > 1 ? H * 0.55 + len * fsz * 0.62 : H;   // rund, eller pille for lange numre
+        const st = BV.colors.chip(dep.line, ctx);
+        if (st) g.classList.add('colored');
+        svg('rect', { x: -w / 2, y: -H / 2, width: w, height: H, rx: H / 2, class: 'mark-bg', style: st ? `fill:${st.bg}` : '' }, inner);
+        const t = svg('text', { class: 'mark-text', 'text-anchor': 'middle', 'dominant-baseline': 'central', y: 0.4, style: `font-size:${fsz}px;` + (st ? `fill:${st.fg}` : '') }, inner);
+        t.textContent = dep.line.code;
+        g._hw = w / 2;
+        inner.animate([{ transform: 'scale(0)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }],
+          { duration: BV.anim.ms(700), easing: BV.anim.spring });
+        return g;
+      }
 
-        // Enkel: avganger med under to minutters mellomrom blir én gruppe på samme sted, så
-        // skiltet alltid står der minuttviseren vil være når bussen kommer.
-        // Avansert: hvert merke for seg, flyttes innover ved kollisjon.
-        const items = [];
-        deps.forEach(dep => {
-          const last = items[items.length - 1];
-          items.push({ deps: [dep] });
-        });
-        items.forEach(it => { it.key = it.deps.map(d => d.key).join('+'); });
-        const placed = [];
-        const keep = new Set();
-        items.forEach((it, i) => {
-          const dep = it.deps[0];
-          const ang = angleOf(dep.expected);
-          let r = cfg.r;
-          if (mode !== 'simple') for (const p of placed) {
-            let da = Math.abs(p.ang - ang); if (da > 180) da = 360 - da;
-            if (da < 8 && Math.abs(p.r - r) < cfg.step - 2) r -= cfg.step;
-          }
-          placed.push({ ang, r });
-          keep.add(it.key);
-          let g = markEls.get(it.key);
-          const isNew = !g;
-          if (isNew) {
-            g = svg('g', { class: 'mark' }, marks);
-            const inner = svg('g', { class: 'mark-inner' }, g);
-            const H = cfg.h;
-            // Skiltene i en gruppe står tett ved siden av hverandre, midtstilt på tidspunktet
-            const sizes = it.deps.map(d => {
-              const len = String(d.line.code).length;
-              const fsz = len > 2 ? cfg.font * 0.82 : cfg.font;
-              return { d, fsz, w: len > 1 ? H * 0.55 + len * fsz * 0.62 : H };
-            });
-            const gap = H * 0.12;
-            let x0 = -(sizes.reduce((a, z) => a + z.w, 0) + gap * (sizes.length - 1)) / 2;
-            sizes.forEach(({ d, fsz, w }, k) => {
-              const st = BV.colors.chip(d.line, ctx);
-              if (st) g.classList.add('colored');
-              svg('rect', { x: x0, y: -H / 2, width: w, height: H, rx: H / 2, class: 'mark-bg' + (k ? ' later' : ''), style: st ? `fill:${st.bg}` : '' }, inner);
-              const t = svg('text', { x: x0 + w / 2, class: 'mark-text' + (k ? ' later' : ''), 'text-anchor': 'middle', 'dominant-baseline': 'central', y: 0.4, style: `font-size:${fsz}px;` + (st ? `fill:${st.fg}` : '') }, inner);
-              t.textContent = d.line.code;
-              x0 += w + gap;
-            });
-            g._hw = (sizes.reduce((a, z) => a + z.w, 0) + gap * (sizes.length - 1)) / 2;
-            g._hh = H / 2;
-            markEls.set(it.key, g);
-          }
-          // Enkel: skiltets ytterkant skal ligge inntil urskivens kant, uansett bredde og retning
-          if (mode === 'simple') {
-            const t = (ang - 90) * Math.PI / 180;
-            const ext = Math.abs(Math.cos(t)) * g._hw + Math.abs(Math.sin(t)) * g._hh;
-            r = Math.min(cfg.r, cfg.edge - ext);
-            placed[placed.length - 1].r = r;
-          }
-          // Ligger merket nesten helt under en tidligere buss, vises bare kanten (ikke teksten)
-          if (mode === 'simple') {
-            const covered = placed.slice(0, -1).some(p => { let da = Math.abs(p.ang - ang); if (da > 180) da = 360 - da; return da < 11; });
-            if (g) g.classList.toggle('covered', covered);
-          }
-          const [x, y] = polar(ang, r);
-          g.style.transform = `translate(${x}px, ${y}px)`;
-          g.classList.toggle('next', i === 0);
-          // Avganger langt fram tones litt ned
-          const mins = (dep.expected - now) / 60000;
-          g.style.opacity = mins > 45 ? Math.max(0.35, 1 - (mins - 45) / 20) : 1;
-          if (isNew) {
-            g.querySelector('.mark-inner').animate([{ transform: 'scale(0)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }],
-              { duration: BV.anim.ms(700), easing: BV.anim.spring });
-          }
-        });
-        // Nærmeste buss øverst: senere merker legges bak, så de «glir inn under»
-        for (let i = items.length - 1; i >= 0; i--) { const g = markEls.get(items[i].key); if (g) marks.appendChild(g); }
-        markEls.forEach((g, k) => {
+      function remove(map, keep, big) {
+        map.forEach((g, k) => {
           if (keep.has(k)) return;
-          markEls.delete(k);
-          const a = g.querySelector('.mark-inner').animate([{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.8)', opacity: 0 }],
+          map.delete(k);
+          const target = g.firstChild || g;
+          const a = target.animate([{ transform: 'scale(1)', opacity: 1 }, { transform: `scale(${big ? 1.8 : 0})`, opacity: 0 }],
             { duration: BV.anim.ms(600), easing: BV.anim.ease, fill: 'forwards' });
           a.onfinish = () => g.remove();
         });
       }
 
+      function render(now) {
+        const mode = modeOf();
+        const hour = upcoming(ctx.data, now, false).filter(d => d.expected - now < 59 * 60000);
+        const chips = mode === 'hour' ? hour : hour.slice(0, SHOWN);
+        const dots = mode === 'dots' ? hour.slice(SHOWN) : [];
+
+        const placed = [];
+        const keep = new Set();
+        chips.forEach((dep, i) => {
+          keep.add(dep.key);
+          let g = markEls.get(dep.key);
+          if (!g) { g = makeChip(dep); markEls.set(dep.key, g); }
+          const ang = angleOf(dep.expected);
+          // Skiltets ytterkant ligger inntil urskivens kant, uansett bredde og retning
+          const t = (ang - 90) * Math.PI / 180;
+          const ext = Math.abs(Math.cos(t)) * g._hw + Math.abs(Math.sin(t)) * (H / 2);
+          const r = Math.min(R_CHIP, EDGE - ext);
+          // Nesten helt dekket av en tidligere buss: vis bare kanten
+          const covered = placed.some(p => { let da = Math.abs(p - ang); if (da > 180) da = 360 - da; return da < 11; });
+          placed.push(ang);
+          const [x, y] = polar(ang, r);
+          g.style.transform = `translate(${x}px, ${y}px)`;
+          g.classList.toggle('next', i === 0);
+          g.classList.toggle('covered', covered);
+        });
+        // Nærmeste buss øverst: senere skilt legges bak
+        for (let i = chips.length - 1; i >= 0; i--) { const g = markEls.get(chips[i].key); if (g) marks.appendChild(g); }
+        remove(markEls, keep, true);
+
+        const keepDots = new Set();
+        dots.forEach(dep => {
+          keepDots.add(dep.key);
+          let c = dotEls.get(dep.key);
+          if (!c) {
+            c = svg('circle', { r: 2.3, class: 'bus-dot-later' }, dotLayer);
+            c.animate([{ opacity: 0 }, { opacity: 1 }], { duration: BV.anim.ms(600) });
+            dotEls.set(dep.key, c);
+          }
+          const [x, y] = polar(angleOf(dep.expected), R_CHIP);
+          c.setAttribute('cx', x); c.setAttribute('cy', y);
+        });
+        remove(dotEls, keepDots, false);
+      }
+
       return {
         update(now) { render(now); },
         tick(now) { render(now); },
-        restyle() { build(); render(Date.now()); },
+        restyle() { markEls.forEach(g => g.remove()); markEls.clear(); render(Date.now()); },
         resize() { },
         destroy() { cancelAnimationFrame(raf); }
       };

@@ -603,3 +603,4 @@ body.no-stopname .topbar-stop { opacity: 0; transform: translateY(-24px); pointe
 .w-clock.simple .mark.covered .mark-text { opacity: 0; }
 .w-clock .mark.colored.next .mark-bg { stroke: none; }
 .w-clock.simple .mark.colored.next .mark-bg { stroke: #262626; }
+.bus-dot-later { fill: #a0a0a0; }
