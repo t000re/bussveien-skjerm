@@ -1,5 +1,7 @@
-/* Analog klokke. Avgangene den neste timen ligger som små linjemerker langs urskiven,
-   og en grønn bue viser tiden fram til neste buss. */
+/* Analog klokke med to varianter:
+   Avansert – alle avgangene den neste timen som små linjemerker, minuttstreker og sekundviser.
+   Enkel    – bare time- og minuttviser og de tre neste bussene som store, lesbare linjeskilt.
+   I begge viser en grønn bue tiden fram til neste buss. */
 (function (BV) {
   const { svg, upcoming } = BV.util;
   const C = 100;            // senter i viewBox 200×200
@@ -27,6 +29,7 @@
     title: 'Klokke',
     description: 'Urskive med avgangene den neste timen',
     sizes: ['6x5', '6x8', '6x4', '4x4'],
+    modes: [{ id: 'advanced', label: 'Avansert' }, { id: 'simple', label: 'Enkel' }],
 
     available() { return { show: true, must: false }; },
 
@@ -34,30 +37,53 @@
       root.classList.add('w-clock');
       const s = svg('svg', { viewBox: '0 0 200 200', class: 'clock-svg', preserveAspectRatio: 'xMidYMid meet' });
       root.appendChild(s);
-      svg('circle', { cx: C, cy: C, r: R_FACE, class: 'clock-face' }, s);
-      const ticks = svg('g', { class: 'clock-ticks' }, s);
-      for (let i = 0; i < 60; i++) {
-        const major = i % 15 === 0, hour = i % 5 === 0;
-        if (!hour) {
-          const [x0, y0] = polar(i * 6, R_FACE - 6);
-          const [x1, y1] = polar(i * 6, R_FACE - 4);
-          svg('line', { x1: x0, y1: y0, x2: x1, y2: y1, class: 'tick minor' }, ticks);
-          continue;
+      const modeOf = () => ((ctx.settings.widgets.find(w => w.id === 'clock') || {}).mode) || 'advanced';
+      let mode, arc, marks, hourHand, minHand, secHand, cfg;
+
+      function build() {
+        mode = modeOf();
+        const simple = mode === 'simple';
+        root.classList.toggle('simple', simple);
+        // Merkestørrelse og antall per variant
+        cfg = simple
+          ? { max: 3, h: 26, font: 15, r: 64, step: 28, hourLen: 34, minLen: 56 }
+          : { max: 99, h: 11, font: 6.6, r: R_MARK, step: 12, hourLen: 44, minLen: 74 };
+        s.innerHTML = '';
+        markEls.clear();
+        svg('circle', { cx: C, cy: C, r: R_FACE, class: 'clock-face' }, s);
+        const ticks = svg('g', { class: 'clock-ticks' }, s);
+        if (simple) {
+          // Bare fire prikker for kvartene
+          for (let i = 0; i < 4; i++) {
+            const [x, y] = polar(i * 90, R_FACE - 9);
+            svg('circle', { cx: x, cy: y, r: 2.6, class: 'tick-dot' }, ticks);
+          }
+        } else {
+          for (let i = 0; i < 60; i++) {
+            const major = i % 15 === 0, hour = i % 5 === 0;
+            if (!hour) {
+              const [x0, y0] = polar(i * 6, R_FACE - 6);
+              const [x1, y1] = polar(i * 6, R_FACE - 4);
+              svg('line', { x1: x0, y1: y0, x2: x1, y2: y1, class: 'tick minor' }, ticks);
+              continue;
+            }
+            const [x0, y0] = polar(i * 6, R_FACE - (major ? 13 : 9.5));
+            const [x1, y1] = polar(i * 6, R_FACE - 5);
+            svg('line', { x1: x0, y1: y0, x2: x1, y2: y1, class: 'tick' + (major ? ' major' : '') }, ticks);
+          }
         }
-        const [x0, y0] = polar(i * 6, R_FACE - (major ? 13 : 9.5));
-        const [x1, y1] = polar(i * 6, R_FACE - 5);
-        svg('line', { x1: x0, y1: y0, x2: x1, y2: y1, class: 'tick' + (major ? ' major' : '') }, ticks);
+        arc = svg('path', { class: 'clock-arc', d: '' }, s);
+        hourHand = svg('line', { x1: C, y1: C + 8, x2: C, y2: C - cfg.hourLen, class: 'hand hour' }, s);
+        minHand = svg('line', { x1: C, y1: C + 10, x2: C, y2: C - cfg.minLen, class: 'hand minute' }, s);
+        secHand = simple ? null : svg('line', { x1: C, y1: C + 14, x2: C, y2: C - 80, class: 'hand second' }, s);
+        svg('circle', { cx: C, cy: C, r: 3.6, class: 'hand-hub' }, s);
+        if (!simple) svg('circle', { cx: C, cy: C, r: 1.4, class: 'hand-hub-in' }, s);
+        marks = svg('g', { class: 'clock-marks' }, s);   // merkene over viserne, så de alltid kan leses
       }
-      const arc = svg('path', { class: 'clock-arc', d: '' }, s);
-      const marks = svg('g', { class: 'clock-marks' }, s);
-      const hourHand = svg('line', { x1: C, y1: C + 8, x2: C, y2: C - 44, class: 'hand hour' }, s);
-      const minHand = svg('line', { x1: C, y1: C + 10, x2: C, y2: C - 74, class: 'hand minute' }, s);
-      const secHand = svg('line', { x1: C, y1: C + 14, x2: C, y2: C - 80, class: 'hand second' }, s);
-      svg('circle', { cx: C, cy: C, r: 3.6, class: 'hand-hub' }, s);
-      svg('circle', { cx: C, cy: C, r: 1.4, class: 'hand-hub-in' }, s);
 
       const markEls = new Map();
       let raf;
+      build();
 
       function frame() {
         const now = Date.now();
@@ -65,7 +91,7 @@
         const sec = d.getSeconds() + d.getMilliseconds() / 1000;
         const min = d.getMinutes() + sec / 60;
         const hr = (d.getHours() % 12) + min / 60;
-        secHand.setAttribute('transform', `rotate(${sec * 6} ${C} ${C})`);
+        if (secHand) secHand.setAttribute('transform', `rotate(${sec * 6} ${C} ${C})`);
         minHand.setAttribute('transform', `rotate(${min * 6} ${C} ${C})`);
         hourHand.setAttribute('transform', `rotate(${hr * 30} ${C} ${C})`);
         raf = requestAnimationFrame(frame);
@@ -73,7 +99,8 @@
       raf = requestAnimationFrame(frame);
 
       function render(now) {
-        const deps = upcoming(ctx.data, now, false).filter(d => d.expected - now < 59 * 60000);
+        if (modeOf() !== mode) build();
+        const deps = upcoming(ctx.data, now, false).filter(d => d.expected - now < 59 * 60000).slice(0, cfg.max);
         const next = deps.find(d => d.expected > now);   // buen viser tiden fram til neste buss som ikke har gått
         const a0 = angleOf(now);
         if (next) {
@@ -86,10 +113,10 @@
         const keep = new Set();
         deps.forEach((dep, i) => {
           const ang = angleOf(dep.expected);
-          let r = R_MARK;
+          let r = cfg.r;
           for (const p of placed) {
             let da = Math.abs(p.ang - ang); if (da > 180) da = 360 - da;
-            if (da < 8 && Math.abs(p.r - r) < 10) r -= 12;
+            if (da < (mode === 'simple' ? 18 : 8) && Math.abs(p.r - r) < cfg.step - 2) r -= cfg.step;
           }
           placed.push({ ang, r });
           keep.add(dep.key);
@@ -99,11 +126,12 @@
             g = svg('g', { class: 'mark' }, marks);
             const inner = svg('g', { class: 'mark-inner' }, g);
             const len = String(dep.line.code).length;
-            const mw = len > 2 ? 6 + len * 3.6 : 11;
+            const H = cfg.h, fsz = len > 2 ? cfg.font * 0.82 : cfg.font;
+            const mw = len > 1 ? H * 0.55 + len * fsz * 0.62 : H;
             const st = BV.colors.chip(dep.line, ctx);
             if (st) g.classList.add('colored');
-            svg('rect', { x: -mw / 2, y: -5.5, width: mw, height: 11, rx: 5.5, class: 'mark-bg', style: st ? `fill:${st.bg}` : '' }, inner);
-            const t = svg('text', { class: 'mark-text', 'text-anchor': 'middle', 'dominant-baseline': 'central', y: 0.4, style: (len > 2 ? 'font-size:5.4px;' : '') + (st ? `fill:${st.fg}` : '') }, inner);
+            svg('rect', { x: -mw / 2, y: -H / 2, width: mw, height: H, rx: mode === 'simple' ? H * 0.3 : H / 2, class: 'mark-bg', style: st ? `fill:${st.bg}` : '' }, inner);
+            const t = svg('text', { class: 'mark-text', 'text-anchor': 'middle', 'dominant-baseline': 'central', y: 0.4, style: `font-size:${fsz}px;` + (st ? `fill:${st.fg}` : '') }, inner);
             t.textContent = dep.line.code;
             markEls.set(dep.key, g);
           }
@@ -130,7 +158,7 @@
       return {
         update(now) { render(now); },
         tick(now) { render(now); },
-        restyle() { markEls.forEach(g => g.remove()); markEls.clear(); render(Date.now()); },
+        restyle() { build(); render(Date.now()); },
         resize() { },
         destroy() { cancelAnimationFrame(raf); }
       };

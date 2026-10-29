@@ -580,3 +580,11 @@ body.no-stopname .topbar-stop { opacity: 0; transform: translateY(-24px); pointe
 .route-time.no-unit .t-num { font-size: .82em; letter-spacing: -0.02em; }
 .route-next { flex: 0 0 auto; padding: 0 .55em 0 calc(var(--seg-r) + .55em); }
 .route-time.empty { visibility: hidden; }
+
+/* Enkel klokke */
+.tick-dot { fill: #8c8c8c; }
+.w-clock.simple .hand.hour { stroke-width: 6; }
+.w-clock.simple .hand.minute { stroke: #e6e6e6; stroke-width: 4; }
+.w-clock.simple .mark-text { font-weight: 700; }
+.w-clock.simple .mark-bg { fill: #3d3d3d; }
+.w-clock.simple .mark.next .mark-bg { fill: var(--green); }
