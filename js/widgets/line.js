@@ -202,6 +202,7 @@
 
   // Setter tekst som skal få plass i maxW: enten forkortes den («…») eller skriften krymper
   // (ned til 10 px; er det fortsatt for trangt, forkortes den i tillegg).
+  const EDGE = 20;   // luft fra boksens kant inn til navnene
   function setFit(el, text, size, maxW, weight, mode) {
     let fsz = size;
     if (mode === 'shrink') {
@@ -285,6 +286,16 @@
           dy = Math.min(C * 0.2, 64);
           o0 = forked ? Math.min(C - 110, 40 + (lanes - 1) * dy + (topLabels ? 90 : 0)) : Math.min(C * 0.3, 90);
           o0 = Math.max(o0, 30 + (lanes - 1) * dy);
+          if (topLabels) {
+            // Navn på begge sider: del bredden etter hvor lange navnene er på hver side
+            const widest = names => Math.min(260, Math.max(0, ...names.map(t => textWidth(t, fs))));
+            const leftW = widest([m.up, m.down].flatMap(sm => sm.branches.filter((b, bi) => sm.branchLane(bi) > 0).flatMap(b => b.nodes)).map(n => n.name));
+            const rightW = widest([...m.up.trunk, ...m.down.trunk, ...[m.up, m.down].flatMap(sm => sm.branches.filter((b, bi) => sm.branchLane(bi) === 0).flatMap(b => b.nodes))].map(n => n.name).concat(m.hereName));
+            const avail = C - (lanes - 1) * dy - 2 * (22 + EDGE);
+            const k = Math.min(1, avail / Math.max(1, leftW + rightW));
+            const spare = Math.max(0, avail - (leftW + rightW) * k);
+            o0 = EDGE + 22 + leftW * k + spare / 2 + (lanes - 1) * dy;
+          }
         } else {
           // Mål navnene som skal stå under og over linjen, og fordel høyden etter behov
           const bottomNames = [...m.up.trunk, ...m.down.trunk, ...[m.up, m.down].flatMap(sm => sm.branches.filter((b, bi) => sm.branchLane(bi) === 0).flatMap(b => b.nodes))].map(n => n.name);
@@ -398,7 +409,7 @@
           const weight = o.weight || 500;
           if (vertical) {
             const side = o.above ? -1 : 1;
-            const room = side > 0 ? C - p.o - 26 : p.o - 26;
+            const room = (side > 0 ? C - p.o : p.o) - 22 - EDGE;
             const anchor = side > 0 ? 'start' : 'end';
             const t = svg('text', { x: P.x + side * 22, y: o.sub ? P.y - 11 : P.y, class: cls, 'text-anchor': anchor, 'dominant-baseline': 'central', 'font-size': fs }, labels);
             setFit(t, text, fs, room, weight, fitMode);
@@ -411,7 +422,7 @@
             const room = Math.min(280, o.above ? (p.o - 14) / Math.SQRT1_2 - 6 : (C - p.o - 16) / Math.SQRT1_2 - 6);
             // Ville navnet stikke ut på høyre side, speiles det og henger inn mot midten i stedet
             const need = Math.min(room, textWidth(text, fs, weight)) * Math.SQRT1_2;
-            const mirror = !o.sub && P.x + off + need > W - 8;
+            const mirror = !o.sub && P.x + off + need > W - EDGE;
             const tf = mirror
               ? (o.above ? `translate(${P.x - off}, ${P.y - 14 - off}) rotate(45)` : `translate(${P.x - off}, ${P.y + 14 + off}) rotate(-45)`)
               : (o.above ? `translate(${P.x + off}, ${P.y - 14 - off}) rotate(-45)` : `translate(${P.x + off}, ${P.y + 14 + off}) rotate(45)`);
@@ -428,7 +439,7 @@
             setFit(t, text, fs, o.room || slot * 0.94, weight, fitMode);
             // Hold navnet innenfor boksen (stoppene ytterst kan ellers klippes)
             const tw = textWidth(t.textContent, parseFloat(t.getAttribute('font-size')) || fs, weight);
-            const cx = Math.max(tw / 2 + 6, Math.min(W - tw / 2 - 6, P.x));
+            const cx = Math.max(tw / 2 + EDGE, Math.min(W - tw / 2 - EDGE, P.x));
             if (cx !== P.x) t.setAttribute('x', cx);
             if (o.sub) {
               const s2 = svg('text', { x: P.x, y: y + fs + 2, class: 'stop-label you-sub', 'text-anchor': 'middle', 'font-size': fs - 3 }, labels);
@@ -442,7 +453,7 @@
           const P = map(p.a, p.o);
           const sideDir = vertical ? 1 : dir;
           const x = P.x + sideDir * (r + 10);
-          if (vertical) room = C - x - 10;
+          if (vertical) room = C - x - EDGE;
           const t = svg('text', { x, y: P.y, class: 'stop-label term-label', 'text-anchor': sideDir > 0 ? 'start' : 'end', 'dominant-baseline': 'central', 'font-size': fs }, labels);
           const wr = wrapName(tm.name, fs, 600);
           if (wr.lines.length === 1) { setFit(t, tm.name, fs, room, 600, fitMode); return; }
@@ -581,13 +592,12 @@
       }
 
       // Tidslinje for en reise i abstrakte koordinater: [{a,o,time}].
-      // Bussen vises fra N stopp før holdeplassen til N stopp etter. Stopp som ikke er tegnet
+      // Bussen vises på alle stoppene som er tegnet før og etter holdeplassen. Stopp som ikke er tegnet
       // (lenger unna enn de viste), fordeles langs den stiplede linjen.
       function journeyTrack(j, k, o) {
         const pts = [];
-        const calls = j.calls, v = ctx.settings.view;
-        const nBefore = o.overview ? 99 : Math.max(1, Math.min(5, v.busStops || 2));
-        const nAfter = o.overview ? 99 : Math.max(1, Math.min(5, v.busStopsAfter || 2));
+        const calls = j.calls;
+        const nBefore = o.before, nAfter = o.after;
 
         const ups = [];
         for (let i = Math.max(0, k - nBefore); i < k; i++) ups.push({ i, dist: k - i, p: G.nodePos.get('up|' + calls[i].stopId) });
@@ -668,7 +678,8 @@
         const nextKey = (BV.util.upcoming(ctx.data, now, false)[0] || {}).journeyId;
         const keep = new Set();
         const items = [];
-        m.journeys.forEach(({ j, k }) => {
+        // I oversikten (hele traseen) vises ingen busser
+        if (!ovOn) m.journeys.forEach(({ j, k }) => {
           const pos = busPosition(journeyTrack(j, k, m.o), now);
           if (!pos) return;
           keep.add(j.journeyId);

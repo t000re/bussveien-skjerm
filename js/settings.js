@@ -69,7 +69,7 @@ window.BV = window.BV || {};
       preset: 'skisse2',
       widgets: clone(PRESETS.skisse2.widgets),
       sim: { traffic: false, autoTraffic: true },
-      view: { grid: false, speed: 1, colorMode: 'neutral', busStops: 2, busStopsAfter: 2, labelAngle: 'flat', cardColor: null, labelFit: 'truncate', overview: 'off', overviewEvery: 2, overviewFor: 15, stopsBefore: 3, stopsAfter: 3, showOrigin: true, showTerminus: true },
+      view: { grid: false, speed: 1, colorMode: 'neutral', labelAngle: 'flat', cardColor: null, labelFit: 'truncate', overview: 'off', overviewEvery: 2, overviewFor: 15, stopsBefore: 3, stopsAfter: 3, showOrigin: true, showTerminus: true },
       lineColors: {},
       manual: {}
     };
@@ -299,11 +299,7 @@ window.BV = window.BV || {};
       toggle(state.view.showTerminus, v => { state.view.showTerminus = v; changed('view'); }, 'Endeholdeplass'),
       state.view.showTerminus !== false ? h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Endeholdeplass for antall ruter (flest avganger først)'),
         seg([1, 2, 3, 4].map(n => ({ id: n, label: String(n) })).concat([{ id: 'all', label: 'Alle' }]),
-          state.view.maxTermini || 3, v => { state.view.maxTermini = v; changed('view'); render(); })) : null,
-      h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Busser før holdeplassen (stopp)'),
-        seg(nums(5), state.view.busStops || 2, v => { state.view.busStops = v; changed('view'); render(); })),
-      h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Busser etter holdeplassen (stopp)'),
-        seg(nums(5), state.view.busStopsAfter || 2, v => { state.view.busStopsAfter = v; changed('view'); render(); }))));
+          state.view.maxTermini || 3, v => { state.view.maxTermini = v; changed('view'); render(); })) : null));
 
     body.append(section('Snarveier', keysList(),
       h('button', {
