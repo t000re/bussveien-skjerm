@@ -590,3 +590,7 @@ body.no-stopname .topbar-stop { opacity: 0; transform: translateY(-24px); pointe
 .w-clock.simple .mark.next .mark-bg { fill: var(--green); }
 .hand.second.braun { stroke: #f6b21a; stroke-width: 0.9; }
 .hand-hub-in.braun { fill: #f6b21a; }
+.clock-track { fill: none; stroke: #333; stroke-width: 1; }
+.w-clock.simple .mark.next .mark-bg.later { fill: #3d3d3d; }
+.w-clock .mark.colored.next .mark-bg.later { stroke: none; }
+.w-clock .mark.next .mark-text.later { fill: #e6e6e6; }

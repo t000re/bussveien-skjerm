@@ -46,7 +46,7 @@
         root.classList.toggle('simple', simple);
         // Merkestørrelse og antall per variant
         cfg = simple
-          ? { max: 3, h: 21, font: 11.5, r: 66, step: 23, hourLen: 34, minLen: 56 }
+          ? { max: 3, h: 21, font: 11.5, r: 66, step: 23, hourLen: 36, minLen: 66 }
           : { max: 99, h: 11, font: 6.6, r: R_MARK, step: 12, hourLen: 44, minLen: 74 };
         s.innerHTML = '';
         markEls.clear();
@@ -72,6 +72,8 @@
             svg('line', { x1: x0, y1: y0, x2: x1, y2: y1, class: 'tick' + (major ? ' major' : '') }, ticks);
           }
         }
+        // Enkel: svak ring der minuttviserens spiss og linjeskiltene møtes
+        if (simple) svg('circle', { cx: C, cy: C, r: cfg.r, class: 'clock-track' }, s);
         arc = svg('path', { class: 'clock-arc', d: '' }, s);
         hourHand = svg('line', { x1: C, y1: C + 8, x2: C, y2: C - cfg.hourLen, class: 'hand hour' }, s);
         minHand = svg('line', { x1: C, y1: C + 10, x2: C, y2: C - cfg.minLen, class: 'hand minute' }, s);
@@ -111,32 +113,51 @@
           arc.style.opacity = 1;
         } else arc.style.opacity = 0;
 
-        // Plasser merker, og flytt innover hvis de kolliderer med et tidligere merke
+        // Enkel: avganger med under to minutters mellomrom blir én gruppe på samme sted, så
+        // skiltet alltid står der minuttviseren vil være når bussen kommer.
+        // Avansert: hvert merke for seg, flyttes innover ved kollisjon.
+        const items = [];
+        deps.forEach(dep => {
+          const last = items[items.length - 1];
+          if (mode === 'simple' && last && dep.expected - last.deps[0].expected < 2 * 60000) last.deps.push(dep);
+          else items.push({ deps: [dep] });
+        });
+        items.forEach(it => { it.key = it.deps.map(d => d.key).join('+'); });
         const placed = [];
         const keep = new Set();
-        deps.forEach((dep, i) => {
+        items.forEach((it, i) => {
+          const dep = it.deps[0];
           const ang = angleOf(dep.expected);
           let r = cfg.r;
-          for (const p of placed) {
+          if (mode !== 'simple') for (const p of placed) {
             let da = Math.abs(p.ang - ang); if (da > 180) da = 360 - da;
-            if (da < (mode === 'simple' ? 18 : 8) && Math.abs(p.r - r) < cfg.step - 2) r -= cfg.step;
+            if (da < 8 && Math.abs(p.r - r) < cfg.step - 2) r -= cfg.step;
           }
           placed.push({ ang, r });
-          keep.add(dep.key);
-          let g = markEls.get(dep.key);
+          keep.add(it.key);
+          let g = markEls.get(it.key);
           const isNew = !g;
           if (isNew) {
             g = svg('g', { class: 'mark' }, marks);
             const inner = svg('g', { class: 'mark-inner' }, g);
-            const len = String(dep.line.code).length;
-            const H = cfg.h, fsz = len > 2 ? cfg.font * 0.82 : cfg.font;
-            const mw = len > 1 ? H * 0.55 + len * fsz * 0.62 : H;
-            const st = BV.colors.chip(dep.line, ctx);
-            if (st) g.classList.add('colored');
-            svg('rect', { x: -mw / 2, y: -H / 2, width: mw, height: H, rx: H / 2, class: 'mark-bg', style: st ? `fill:${st.bg}` : '' }, inner);
-            const t = svg('text', { class: 'mark-text', 'text-anchor': 'middle', 'dominant-baseline': 'central', y: 0.4, style: `font-size:${fsz}px;` + (st ? `fill:${st.fg}` : '') }, inner);
-            t.textContent = dep.line.code;
-            markEls.set(dep.key, g);
+            const H = cfg.h;
+            // Skiltene i en gruppe står tett ved siden av hverandre, midtstilt på tidspunktet
+            const sizes = it.deps.map(d => {
+              const len = String(d.line.code).length;
+              const fsz = len > 2 ? cfg.font * 0.82 : cfg.font;
+              return { d, fsz, w: len > 1 ? H * 0.55 + len * fsz * 0.62 : H };
+            });
+            const gap = H * 0.12;
+            let x0 = -(sizes.reduce((a, z) => a + z.w, 0) + gap * (sizes.length - 1)) / 2;
+            sizes.forEach(({ d, fsz, w }, k) => {
+              const st = BV.colors.chip(d.line, ctx);
+              if (st) g.classList.add('colored');
+              svg('rect', { x: x0, y: -H / 2, width: w, height: H, rx: H / 2, class: 'mark-bg' + (k ? ' later' : ''), style: st ? `fill:${st.bg}` : '' }, inner);
+              const t = svg('text', { x: x0 + w / 2, class: 'mark-text' + (k ? ' later' : ''), 'text-anchor': 'middle', 'dominant-baseline': 'central', y: 0.4, style: `font-size:${fsz}px;` + (st ? `fill:${st.fg}` : '') }, inner);
+              t.textContent = d.line.code;
+              x0 += w + gap;
+            });
+            markEls.set(it.key, g);
           }
           const [x, y] = polar(ang, r);
           g.style.transform = `translate(${x}px, ${y}px)`;
