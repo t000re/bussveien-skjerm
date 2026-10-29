@@ -423,6 +423,10 @@
             const y = o.above ? P.y - (compact ? 20 : 24) : P.y + (compact ? 30 : 38);
             const t = svg('text', { x: P.x, y, class: cls, 'text-anchor': 'middle', 'font-size': fs }, labels);
             setFit(t, text, fs, o.room || slot * 0.94, weight, fitMode);
+            // Hold navnet innenfor boksen (stoppene ytterst kan ellers klippes)
+            const tw = textWidth(t.textContent, parseFloat(t.getAttribute('font-size')) || fs, weight);
+            const cx = Math.max(tw / 2 + 6, Math.min(W - tw / 2 - 6, P.x));
+            if (cx !== P.x) t.setAttribute('x', cx);
             if (o.sub) {
               const s2 = svg('text', { x: P.x, y: y + fs + 2, class: 'stop-label you-sub', 'text-anchor': 'middle', 'font-size': fs - 3 }, labels);
               s2.textContent = o.sub;
@@ -450,7 +454,8 @@
         }
 
         const nodePos = new Map();
-        const gapPath = new Map();  // side|stopId -> { from, mid } – første del av veien mot endeholdeplassen
+        const gapPath = new Map();
+        const stubs = new Map();    // side|o -> ende av stiplet linje når endeholdeplassen ikke vises  // side|stopId -> { from, mid } – første del av veien mot endeholdeplassen
         const here = { a: aC, o: o0 };
 
         function side(name, sm, dir) {
@@ -483,7 +488,9 @@
             const from = endPos[e.bi];
             if (from && e.hidden && !sm.terms.some(t => t.bis.has(e.bi))) {
               // Linjen fortsetter, men endeholdeplassen vises ikke: stiplet helt ut til kanten
-              seg(dir, from.p, { a: dir > 0 ? L - padEdge : padEdge, o: from.p.o }, from.lines, 'track gap');
+              const stubEnd = { a: dir > 0 ? L - padEdge : padEdge, o: from.p.o };
+              seg(dir, from.p, stubEnd, from.lines, 'track gap');
+              stubs.set(name + '|' + Math.round(from.p.o), stubEnd);
             }
           });
           sm.terms.forEach((tm, i) => {
@@ -500,7 +507,7 @@
               const mid = { a: from.p.a + dir * forkLen, o };
               seg(dir, from.p, mid, [...tm.lines], cls);
               seg(dir, mid, p, [...tm.lines], cls);
-              gapPath.set(name + '|' + tm.name.trim().toLowerCase() + '|' + Math.round(from.p.o), { from: from.p, mid });
+              gapPath.set(name + '|' + tm.name.trim().toLowerCase() + '|' + Math.round(from.p.o), { from: from.p, mid, term: p });
             });
             const P = map(p.a, p.o);
             svg('circle', { cx: P.x, cy: P.y, r: r + 1, class: 'term-dot' }, dots);
@@ -529,7 +536,7 @@
         busEls.clear();
         // Med gaffel legger bussmerkene seg på linjen (ingen «stilk»), så de ikke kolliderer med sporene over
         const prevG = G, prevSvg = root.querySelector('svg.line-svg:not(.leaving)');
-        G = { vertical, pill: vertical || forked, map, nodePos, gapPath, here, slot };
+        G = { vertical, pill: vertical || forked, map, nodePos, gapPath, stubs, here, slot };
 
         if (animate === 'zoom' && prevSvg && prevG && prevG.vertical === vertical) {
           // Zoom mellom detalj og oversikt: begge visningene skaleres rundt «Du er her»,
@@ -559,27 +566,59 @@
       }
 
       /* ----- Busser ----- */
+      const lerp = (p, q, u) => ({ a: p.a + (q.a - p.a) * u, o: p.o + (q.o - p.o) * u });
+      // Vei ut forbi de viste stoppene: langs gaffelen mot start-/endeholdeplassen, eller langs
+      // den stiplede linjen ut til kanten. f = 0 ved siste viste stopp, 1 ved enden.
+      function beyond(side, from, endName) {
+        const gp = G.gapPath.get(side + '|' + endName.trim().toLowerCase() + '|' + Math.round(from.o));
+        if (gp) return f => f <= 0.5 ? bez(gp.from, gp.mid, f / 0.5) : lerp(gp.mid, gp.term, (f - 0.5) / 0.5);
+        const st = G.stubs.get(side + '|' + Math.round(from.o));
+        if (st) return f => lerp(from, st, f);
+        return null;
+      }
+
+      // Tidslinje for en reise i abstrakte koordinater: [{a,o,time}].
+      // Bussen vises fra N stopp før holdeplassen til N stopp etter. Stopp som ikke er tegnet
+      // (lenger unna enn de viste), fordeles langs den stiplede linjen.
       function journeyTrack(j, k, o) {
         const pts = [];
-        const calls = j.calls;
-        const ahead = o.overview ? o.before : Math.max(1, Math.min(o.before, ctx.settings.view.busStops || 2));
-        for (let i = Math.max(0, k - ahead); i < k; i++) {
-          const p = G.nodePos.get('up|' + calls[i].stopId);
-          if (p) pts.push({ a: p.a, o: p.o, time: calls[i].time, appear: !pts.length });
-        }
+        const calls = j.calls, v = ctx.settings.view;
+        const nBefore = o.overview ? 99 : Math.max(1, Math.min(5, v.busStops || 2));
+        const nAfter = o.overview ? 99 : Math.max(1, Math.min(5, v.busStopsAfter || 2));
+
+        const ups = [];
+        for (let i = Math.max(0, k - nBefore); i < k; i++) ups.push({ i, dist: k - i, p: G.nodePos.get('up|' + calls[i].stopId) });
+        const farU = ups.find(u => u.p) || { p: G.here, dist: 0 };
+        const fnU = ups.some(u => !u.p && u.dist > farU.dist) ? beyond('up', farU.p, calls[0].name) : null;
+        ups.forEach(u => {
+          let p = u.p;
+          if (!p && fnU && u.dist > farU.dist) p = fnU((u.dist - farU.dist) / (nBefore - farU.dist + 1));
+          if (p) pts.push({ a: p.a, o: p.o, time: calls[u.i].time, appear: !pts.length });
+        });
         if (!pts.length) pts.push({ ...G.here, time: calls[k].time - 60000, appear: true });
         pts.push({ ...G.here, time: calls[k].time });
-        let lastI = k;
-        for (let i = k + 1; i <= Math.min(calls.length - 1, k + o.after); i++) {
-          const p = G.nodePos.get('down|' + calls[i].stopId);
-          if (p) { pts.push({ a: p.a, o: p.o, time: calls[i].time }); lastI = i; }
-        }
-        // Videre: bussen følger gaffelen mot sin endeholdeplass og tones ut
+
+        const downs = [];
+        for (let i = k + 1; i <= Math.min(calls.length - 1, k + nAfter); i++) downs.push({ i, dist: i - k, p: G.nodePos.get('down|' + calls[i].stopId) });
+        const vis = downs.filter(d => d.p);
+        const farD = vis.length ? vis[vis.length - 1] : { p: G.here, dist: 0 };
+        const fnD = beyond('down', farD.p, calls[calls.length - 1].name);
+        const fOf = dist => (dist - farD.dist) / (nAfter - farD.dist + 1);
+        let lastDist = 0;
+        downs.forEach(d => {
+          let p = d.p;
+          if (!p && fnD && d.dist > farD.dist) p = fnD(fOf(d.dist));
+          if (p) { pts.push({ a: p.a, o: p.o, time: calls[d.i].time }); lastDist = d.dist; }
+        });
+        // Siste strekk: bussen glir litt videre og tones ut
         const lastP = pts[pts.length - 1];
-        const gp = G.gapPath.get('down|' + calls[calls.length - 1].name.trim().toLowerCase() + '|' + Math.round(lastP.o));
-        const nextCall = calls[lastI + 1];
-        if (gp && nextCall) pts.push({ ...gp.mid, time: nextCall.time, edge: true, curveFrom: gp.from, curveTo: gp.mid });
-        else pts.push({ a: lastP.a, o: lastP.o, time: lastP.time + 60000, edge: true });
+        const next = calls[k + lastDist + 1];
+        if (next && fnD && lastDist >= farD.dist) {
+          const q = fnD(Math.min(1, fOf(lastDist + 1)));
+          pts.push({ a: q.a, o: q.o, time: next.time, edge: true });
+        } else {
+          pts.push({ a: lastP.a, o: lastP.o, time: lastP.time + 60000, edge: true });
+        }
         return pts;
       }
 
@@ -604,6 +643,7 @@
         const bw = Math.max(34, 14 + code.length * 12);
         const st = BV.colors.chip(j.line || { code: j.lineCode }, ctx);
         if (st) g.classList.add('colored');
+        g._len = G.vertical ? 46 : bw + 16;   // plass merket tar langs linjen (med pil)
         const cy = G.pill ? 0 : -39;   // midten av merket
         if (!G.pill) {
           svg('line', { x1: 0, y1: -8, x2: 0, y2: -22, class: 'bus-stem' }, inner);
@@ -624,15 +664,41 @@
         if (!m || !busLayer || !G) return;
         const nextKey = (BV.util.upcoming(ctx.data, now, false)[0] || {}).journeyId;
         const keep = new Set();
+        const items = [];
         m.journeys.forEach(({ j, k }) => {
           const pos = busPosition(journeyTrack(j, k, m.o), now);
           if (!pos) return;
           keep.add(j.journeyId);
-          const P = G.map(pos.a, pos.o);
-          let g = busEls.get(j.journeyId);
-          if (!g) {
-            g = makeBus(j);
-            busEls.set(j.journeyId, g);
+          let g = busEls.get(j.journeyId), fresh = false;
+          if (!g) { g = makeBus(j); busEls.set(j.journeyId, g); fresh = true; }
+          items.push({ j, g, pos, fresh, a: pos.a });
+        });
+
+        // Kollisjonsmargin: merker på samme spor skyves fra hverandre langs linjen (rekkefølgen beholdes)
+        const MARGIN = 8, scale = ovOn ? 0.72 : 1;
+        const lanes = new Map();
+        items.forEach(it => {
+          const key = Math.round(it.pos.o / 6);
+          if (!lanes.has(key)) lanes.set(key, []);
+          lanes.get(key).push(it);
+        });
+        lanes.forEach(list => {
+          list.sort((x, y) => x.a - y.a);
+          for (let pass = 0; pass < 8; pass++) {
+            let moved = false;
+            for (let i = 1; i < list.length; i++) {
+              const p = list[i - 1], c = list[i];
+              const need = (p.g._len + c.g._len) / 2 * scale + MARGIN;
+              const over = need - (c.a - p.a);
+              if (over > 0.5) { p.a -= over / 2; c.a += over / 2; moved = true; }
+            }
+            if (!moved) break;
+          }
+        });
+
+        items.forEach(({ j, g, pos, fresh, a }) => {
+          const P = G.map(a, pos.o);
+          if (fresh) {
             g.style.transition = 'none';
             g.style.transform = `translate(${P.x}px, ${P.y}px)`;
             g.getBoundingClientRect();

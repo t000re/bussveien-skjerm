@@ -50,7 +50,7 @@ window.BV = window.BV || {};
       preset: 'skisse2',
       widgets: clone(PRESETS.skisse2.widgets),
       sim: { traffic: false, autoTraffic: true },
-      view: { grid: false, speed: 1, colorMode: 'neutral', busStops: 2, labelAngle: 'flat', cardColor: null, labelFit: 'truncate', overview: 'off', overviewEvery: 2, overviewFor: 15, stopsBefore: 3, stopsAfter: 3, showOrigin: true, showTerminus: true },
+      view: { grid: false, speed: 1, colorMode: 'neutral', busStops: 2, busStopsAfter: 2, labelAngle: 'flat', cardColor: null, labelFit: 'truncate', overview: 'off', overviewEvery: 2, overviewFor: 15, stopsBefore: 3, stopsAfter: 3, showOrigin: true, showTerminus: true },
       lineColors: {},
       manual: {}
     };
@@ -264,13 +264,15 @@ window.BV = window.BV || {};
         seg([10, 15, 30, 60].map(n => ({ id: n, label: n + ' s' })),
           state.view.overviewFor || 15, v => { state.view.overviewFor = v; changed('view'); render(); })) : null,
       h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Stopp før'),
-        seg(nums(5), state.view.stopsBefore, v => { state.view.stopsBefore = v; if (state.view.busStops > v) state.view.busStops = v; changed('view'); render(); })),
+        seg(nums(5), state.view.stopsBefore, v => { state.view.stopsBefore = v; changed('view'); render(); })),
       h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Stopp etter'),
         seg(nums(5), state.view.stopsAfter, v => { state.view.stopsAfter = v; changed('view'); render(); })),
       toggle(state.view.showOrigin, v => { state.view.showOrigin = v; changed('view'); }, 'Startholdeplass'),
       toggle(state.view.showTerminus, v => { state.view.showTerminus = v; changed('view'); }, 'Endeholdeplass'),
-      h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Vis busser fra (stopp unna)'),
-        seg(nums(state.view.stopsBefore), state.view.busStops, v => { state.view.busStops = v; changed('view'); render(); }))));
+      h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Busser før holdeplassen (stopp)'),
+        seg(nums(5), state.view.busStops || 2, v => { state.view.busStops = v; changed('view'); render(); })),
+      h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Busser etter holdeplassen (stopp)'),
+        seg(nums(5), state.view.busStopsAfter || 2, v => { state.view.busStopsAfter = v; changed('view'); render(); }))));
 
     body.append(section('Snarveier', keysList(),
       h('button', {
